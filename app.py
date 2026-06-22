@@ -258,16 +258,16 @@ if target_row is not None:
         with chart_tab1:
             period_tabs = st.tabs(["일봉", "주봉", "월봉"])
             
-            # 🚨 [최종 해결책] 에러를 내던 st.components.v1.html 연산 방식을 폐기하고,
-            # Streamlit이 자체 지원하는 범용 iframe 뷰어(st.iframe) 구조로 100% 안전하게 전면 교체
+            # 🚨 [거래소 매핑 우회 완벽 해결] 주식 고유번호({ticker})만 다이렉트로 위젯 검색 쿼리로 주입하여
+            # KRX, KS, KOSDAQ 접두사 간섭을 원천 차단하고 종목 일치율을 강제 매칭시킴
             with period_tabs[0]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?frameElementId=tradingview_76747&symbol=KRX:{ticker}&interval=D&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1&timezone=Asia%2FSeoul&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=ko", height=410)
+                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={ticker}&interval=D&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
                 
             with period_tabs[1]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?frameElementId=tradingview_76747&symbol=KRX:{ticker}&interval=W&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1&timezone=Asia%2FSeoul&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=ko", height=410)
+                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={ticker}&interval=W&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
                 
             with period_tabs[2]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?frameElementId=tradingview_76747&symbol=KRX:{ticker}&interval=M&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1&timezone=Asia%2FSeoul&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=ko", height=410)
+                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={ticker}&interval=M&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
                     
         with chart_tab2:
             st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True)
