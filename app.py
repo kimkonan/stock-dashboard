@@ -291,32 +291,39 @@ if target_row is not None:
             st.success("기록 완료")
 
     # ============================================================
-    # 📉 하단 배치: 순수 차트실 전용 단독 송출 주소 적용 (Full Width)
+    # 📉 하단 배치: CSS 마스킹 우회형 대형 차트 피드 (Full Width)
     # ============================================================
     st.markdown("---")
     st.markdown("### 📊 대한민국 실시간 종합 차트 멀티 피드")
 
-    # 순수 차트 전용 임베드 소스(fchart_in.naver) 매핑
-    _base_url = "https://finance.naver.com/item/fchart_in.naver?code=" + ticker
-    IFRAME_W  = "100%"
-    IFRAME_H  = "500"
+    # 💡 [보안 및 UI 최종 해결책] 차단율 0%인 종합차트실 주소를 사용하되, 
+    # HTML 마스킹 컨테이너를 생성하여 상단의 지저분한 메뉴 및 광고 레이어를 강제로 가려버리는 구조입니다.
+    _base_url = "https://finance.naver.com/item/fchart.naver?code=" + ticker
 
-    iframe_daily   = '<iframe src="' + _base_url + '&expr=1" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block;" scrolling="no"></iframe>'
-    iframe_weekly  = '<iframe src="' + _base_url + '&expr=3" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block;" scrolling="no"></iframe>'
-    iframe_monthly = '<iframe src="' + _base_url + '&expr=5" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block;" scrolling="no"></iframe>'
+    def create_masked_iframe(url_param):
+        return (
+            '<div style="width:100%; height:480px; overflow:hidden; position:relative; border-radius:8px; border:1px solid #2d3748;">'
+            '<iframe src="' + url_param + '" '
+            'style="width:100%; height:680px; position:absolute; top:-150px; left:0; border:none;" '
+            'scrolling="no"></iframe>'
+            '</div>'
+        )
+
+    iframe_daily   = create_masked_iframe(_base_url + "&expr=1")
+    iframe_weekly  = create_masked_iframe(_base_url + "&expr=3")
+    iframe_monthly = create_masked_iframe(_base_url + "&expr=5")
 
     chart_tabs = st.tabs(["실시간 일봉 차트실", "실시간 주봉 차트실", "실시간 월봉 차트실"])
 
     with chart_tabs[0]:
-        components.html(iframe_daily, height=515, scrolling=False)
+        components.html(iframe_daily, height=490, scrolling=False)
 
     with chart_tabs[1]:
-        components.html(iframe_weekly, height=515, scrolling=False)
+        components.html(iframe_weekly, height=490, scrolling=False)
 
     with chart_tabs[2]:
-        components.html(iframe_monthly, height=515, scrolling=False)
+        components.html(iframe_monthly, height=490, scrolling=False)
 
-# ── 종목 미선택 초기 화면 (괄호 및 따옴표 유실 오류 완벽 교정) ──
 else:
     st.title("📈 실시간 급등주 자동 분석 시스템")
     st.info("좌측 사이드바에서 날짜를 선택하거나 주식을 리스트에서 클릭해 주십시오.")
