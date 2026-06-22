@@ -4,9 +4,9 @@ from datetime import datetime, date
 import os
 
 # ==========================================
-# 🔐 고유키(비밀번호) 인증 시스템 (무단 사용자 차단)
+# 🔐 고유키(비밀번호) 인증 시스템 (konan0401 추가 완료)
 # ==========================================
-VALID_KEYS = ["trader777", "secret99", "goldpass"]
+VALID_KEYS = ["trader777", "secret99", "goldpass", "konan0401"]
 
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
@@ -258,17 +258,40 @@ if target_row is not None:
         with chart_tab1:
             period_tabs = st.tabs(["일봉", "주봉", "월봉"])
             
-            # 💡 [핵심 보정] 트레이딩뷰 위젯 검색에 완벽 매칭되도록 KRX:A+코드 규격 및 KRX:코드를 결합하여 주입
-            tv_symbol = f"KRX:A{ticker}"
-            
+            # 💡 [원천 해결] 자바스크립트 내장 위젯 방식을 쓰되, 고유 컨테이너 식별자를 완전히 격리하여 
+            # Streamlit 에러와 심볼 매핑 문제를 동시에 해결합니다.
+            def generate_tv_html(ticker_code, interval_code, container_id):
+                return f"""
+                <div style="height:400px; width:100%;">
+                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                    <script type="text/javascript">
+                    new TradingView.widget({{
+                        "autosize": true,
+                        "symbol": "KRX:{ticker_code}",
+                        "interval": "{interval_code}",
+                        "timezone": "Asia/Seoul",
+                        "theme": "dark",
+                        "style": "1",
+                        "locale": "ko",
+                        "toolbar_bg": "#f1f3f6",
+                        "enable_publishing": false,
+                        "hide_side_toolbar": false,
+                        "allow_symbol_change": true,
+                        "container_id": "{container_id}"
+                    }});
+                    </script>
+                    <div id="{container_id}" style="height:100%; width:100%;"></div>
+                </div>
+                """
+
             with period_tabs[0]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={tv_symbol}&interval=D&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
+                st.components.v1.html(generate_tv_html(ticker, "D", f"tv_chart_d_{ticker}"), height=410)
                 
             with period_tabs[1]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={tv_symbol}&interval=W&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
+                st.components.v1.html(generate_tv_html(ticker, "W", f"tv_chart_w_{ticker}"), height=410)
                 
             with period_tabs[2]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={tv_symbol}&interval=M&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
+                st.components.v1.html(generate_tv_html(ticker, "M", f"tv_chart_m_{ticker}"), height=410)
                     
         with chart_tab2:
             st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True)
