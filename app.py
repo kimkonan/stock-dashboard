@@ -257,6 +257,7 @@ if target_row is not None:
             intervals = ["D", "W", "M"]
             for idx, p_tab in enumerate(period_tabs):
                 with p_tab:
+                    current_interval = intervals[idx]
                     tradingview_html = f"""
                     <div style="height:400px;">
                         <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
@@ -264,7 +265,7 @@ if target_row is not None:
                         new TradingView.widget({{
                           "autosize": true,
                           "symbol": "KRX:{ticker}",
-                          "interval": "{intervals[idx]}",
+                          "interval": "{current_interval}",
                           "timezone": "Asia/Seoul",
                           "theme": "dark",
                           "style": "1",
@@ -273,14 +274,15 @@ if target_row is not None:
                           "enable_publishing": false,
                           "hide_side_toolbar": false,
                           "allow_symbol_change": true,
-                          "container_id": "tv_{ticker}_{intervals[idx]}"
+                          "container_id": "tv_{ticker}_{current_interval}"
                         }});
                         </script>
-                        <div id="tv_{ticker}_{intervals[idx]}" style="height:100%;"></div>
+                        <div id="tv_{ticker}_{current_interval}" style="height:100%;"></div>
                     </div>
                     """
-                    # 🚨 key 속성을 완벽히 분리 고정하여 종목 변경 시 강제 리프레시 유도
-                    st.components.v1.html(tradingview_html, height=410, key=f"tv_widget_{ticker}_{intervals[idx]}")
+                    # 🚨 문법 충돌 우려를 우회하여 고유 고정 키 할당
+                    widget_key = f"tv_widget_{ticker}_{current_interval}"
+                    st.components.v1.html(tradingview_html, height=410, key=widget_key)
                     
         with chart_tab2:
             st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True)
