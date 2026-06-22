@@ -221,7 +221,7 @@ if target_row is None and not view_df.empty:
 # 📊 MAIN PANEL 레이아웃 구현
 # ============================================================
 if target_row is not None:
-    ticker  = str(target_row['ticker']).strip().zfill(6)  # 6자리 완전 보정
+    ticker  = str(target_row['ticker']).strip().zfill(6)  # 6자리 자수 보정 명시
     name    = str(target_row['name'])
     change_rate = target_row['change_rate']
     price   = target_row['price']
@@ -319,20 +319,21 @@ if target_row is not None:
             st.success("기록 완료")
 
     # ============================================================
-    # 📉 하단 배치: 외부 UI 차단막 우회형 모바일 실시간 차트실 연동 (Full Width)
+    # 📉 하단 배치: 순수 웹 컴포넌트 실시간 차트 엔진 주입 (Full Width)
     # ============================================================
     st.markdown("---")
     st.markdown("### 📊 대한민국 실시간 종합 차트 멀티 피드")
 
-    # 💡 [보안 강화 완벽 보정] 외부 도메인 차단막(Referer)을 원천 우회하는 
-    # 네이버 금융 모바일 다크 테마 고해상도 순수 라이브 차트 파이프라인 연동
-    _base_url = "https://m.stock.naver.com/domestic/stock/" + ticker + "/chart"
+    # 💡 [주소 원천 복구] 포털 주소변경 문제를 차단하기 위해 
+    # 네이버 내부 자바스크립트 금융 캔들 엔진 주소(candle.nhn)로 안전하게 선언
+    _base_url = "https://fchart.stock.naver.com/candle.nhn?symbol=" + ticker
     IFRAME_W  = "100%"
     IFRAME_H  = "560"
 
-    iframe_daily   = '<iframe src="' + _base_url + '?periodType=day" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block; background:#141923;" scrolling="no"></iframe>'
-    iframe_weekly  = '<iframe src="' + _base_url + '?periodType=week" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block; background:#141923;" scrolling="no"></iframe>'
-    iframe_monthly = '<iframe src="' + _base_url + '?periodType=month" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block; background:#141923;" scrolling="no"></iframe>'
+    # iframe 문자열 사전 조립 (f-string 중괄호 파싱 충돌 완벽 방지)
+    iframe_daily   = '<iframe src="' + _base_url + '&timeFrame=day&count=500" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block; background:#141923;" scrolling="no"></iframe>'
+    iframe_weekly  = '<iframe src="' + _base_url + '&timeFrame=week&count=500" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block; background:#141923;" scrolling="no"></iframe>'
+    iframe_monthly = '<iframe src="' + _base_url + '&timeFrame=month&count=500" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block; background:#141923;" scrolling="no"></iframe>'
     snapshot_url   = "https://ssl.pstatic.net/imgfinance/chart/item/candle/day/" + ticker + ".png"
 
     chart_tabs = st.tabs([
@@ -343,15 +344,15 @@ if target_row is not None:
     ])
 
     with chart_tabs[0]:
-        st.caption("▶ 모바일 연동 실시간 일봉 라이브 차트 (주변 UI 없음)")
+        st.caption("▶ 순수 실시간 일봉 캔들 차트 피드")
         components.html(iframe_daily, height=575, scrolling=False)
 
     with chart_tabs[1]:
-        st.caption("▶ 모바일 연동 실시간 주봉 라이브 차트 (주변 UI 없음)")
+        st.caption("▶ 순수 실시간 주봉 캔들 차트 피드")
         components.html(iframe_weekly, height=575, scrolling=False)
 
     with chart_tabs[2]:
-        st.caption("▶ 모바일 연동 실시간 월봉 라이브 차트 (주변 UI 없음)")
+        st.caption("▶ 순수 실시간 월봉 캔들 차트 피드")
         components.html(iframe_monthly, height=575, scrolling=False)
 
     with chart_tabs[3]:
