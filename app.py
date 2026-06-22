@@ -9,38 +9,24 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+import streamlit.components.v1 as components
 import pandas as pd
 from datetime import datetime, date
 import os
 
 # ============================================================
-# 🔐 고유키(비밀번호) 인증 시스템 (konan0401 포함)
+# 🔓 [보안키 인증 시스템 완전 제거] 
+# 매번 번거롭게 만들던 로그인/비밀번호 화면을 완전히 들어냈습니다.
 # ============================================================
-VALID_KEYS = ["trader777", "secret99", "goldpass", "konan0401"]
-
 if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
+    st.session_state["authenticated"] = True
 
-if not st.session_state["authenticated"]:
-    st.title("🔒 PRO 급등주 대시보드 로그인")
-    st.markdown("본 시스템은 허가된 사용자만 이용할 수 있습니다. 발급받은 고유키를 입력하세요.")
-
-    user_key = st.text_input(
-        "고유 라이선스 키 입력",
-        type="password",
-        placeholder="Access Key를 입력하세요."
-    )
-    if st.button("인증하기", use_container_width=True):
-        if user_key in VALID_KEYS:
-            st.session_state["authenticated"] = True
-            st.success("인증 성공! 대시보드를 로드합니다.")
-            st.rerun()
-        else:
-            st.error("올바르지 않은 고유키입니다. 발급자에게 문의하세요.")
-    st.stop()
+# ── ❌ 종목 삭제 기능을 위한 세션 기억 장치 초기화 ──
+if "deleted_tickers" not in st.session_state:
+    st.session_state["deleted_tickers"] = set()
 
 # ============================================================
-# ✅ 인증 완료 후 코어 모듈 임포트
+# ✅ 코어 모듈 임포트
 # ============================================================
 from database import DatabaseManager
 from crawler import NaverFinanceCrawler
@@ -120,7 +106,7 @@ def run_auto_collection(date_key):
 run_auto_collection(today_str)
 
 # ============================================================
-# 📊 SIDEBAR 레이아웃 구현 (급등주 목록 하단 배치)
+# 📊 SIDEBAR 레이아웃 구현 (종목 삭제/선택 핵심 탑재)
 # ============================================================
 st.sidebar.title("⚡ TRADER DASHBOARD")
 st.sidebar.markdown("---")
@@ -173,21 +159,55 @@ else:
 
 st.sidebar.markdown("---")
 
-# ── 급등주 목록 ──
+# ── 🔥 급등주 목록 + ❌ 개별 삭제 시스템 ──
 st.sidebar.subheader(f"📈 급등주 목록 ({len(view_df)}개)")
 
 target_row = None
 
-if selected_fav_ticker and not view_df.empty:
-    matched = view_df[view_df['ticker'] == selected_fav_ticker]
-    if not matched.empty:
-        target_row = matched.iloc[0]
-
-if target_row is None and not view_df.empty:
-    labels = view_df['name'] + " (" + view_df['ticker'] + ") | +" + view_df['change_rate'].astype(str) + "%"
-    selected_label = st.sidebar.radio("급등주 리스트 선택", options=list(labels), label_visibility="collapsed")
-    selected_name = selected_label.split(" (")[0]
-    target_row = view_df[view_df['name'] == selected_name].iloc[0]
+if not view_df.empty:
+    # 💡 [필터링] 사용자가 지운 종목은 리스트에서 완전히 제외시킵니다.
+    filtered_df = view_df[~view_df['ticker'].isin(st.session_state.deleted_tickers)].reset_index(drop=True)
+    
+    if not filtered_df.empty:
+        # 세션에 고정된 active_ticker가 없거나 이미 지워진 상태라면 첫 종목 강제 지정
+        ticker_list = filtered_df['ticker'].tolist()
+        if "active_ticker" not in st.session_state or st.session_state.active_ticker not in ticker_list:
+            st.session_state.active_ticker = ticker_list[0]
+            
+        # 종목마다 삭제(❌) 버튼과 선택 버튼을 가로로 정렬하여 동적 배치
+        for idx, row in filtered_df.iterrows():
+            side_col1, side_col2 = st.sidebar.columns([0.2, 0.8])
+            
+            # ❌ 버튼 구현
+            if side_col1.button("❌", key=f"del_{row['ticker']}", help=f"{row['name']} 목록에서 제외"):
+                st.session_state.deleted_tickers.add(row['ticker'])
+                st.rerun()
+                
+            # 종목 선택 링크 버튼 구현
+            btn_label = f"{row['name']} (+{row['change_rate']}%)"
+            if st.session_state.active_ticker == row['ticker']:
+                btn_label = f"🔥 {btn_label}"
+                
+            if side_col2.button(btn_label, key=f"sel_{row['ticker']}", use_container_width=True):
+                st.session_state.active_ticker = row['ticker']
+                st.rerun()
+                
+        # 즐겨찾기 연동 보정
+        if selected_fav_ticker and selected_fav_ticker in ticker_list:
+            st.session_state.active_ticker = selected_fav_ticker
+            
+        # 최종 메인 타겟 확정
+        matched_rows = filtered_df[filtered_df['ticker'] == st.session_state.active_ticker]
+        if not matched_rows.empty:
+            target_row = matched_rows.iloc[0]
+    else:
+        st.sidebar.caption("모든 급등주가 제외되었습니다.")
+        
+    st.sidebar.markdown("---")
+    # 🔄 삭제 종목 일괄 복구기 기능 추가
+    if st.sidebar.button("🔄 삭제한 종목 목록 복구", use_container_width=True):
+        st.session_state.deleted_tickers.clear()
+        st.rerun()
 
 # ============================================================
 # 📊 MAIN PANEL 레이아웃 구현
@@ -222,11 +242,8 @@ if target_row is not None:
     # 🏢 상단 분할 레이아웃 [1.2 : 0.8]
     left_col, right_col = st.columns([1.2, 0.8])
 
-   # 🏢 상단 분할 레이아웃 [1.2 : 0.8]
-    left_col, right_col = st.columns([1.2, 0.8])
-
     with left_col:
-        # ── 📉 당일 종가 차트 스냅샷 메인 영역 복구 ──
+        # ── 당일 종가 차트 스냅샷 상단 배치 고정 ──
         st.markdown("### 📉 네이버 금융 기준 당일 거래 현황")
         st.image(
             "https://ssl.pstatic.net/imgfinance/chart/item/candle/day/" + ticker + ".png", 
@@ -278,6 +295,7 @@ if target_row is not None:
                 st.markdown(f"**{idx}** . [{n['title']}]({n['url']}) <span style='color:#7f8c8d; font-size:11px;'>{n['press']} | {n['pub_date']}</span>", unsafe_allow_html=True)
         else:
             st.caption("특징 뉴스가 아직 로드되지 않았거나 존재하지 않습니다.")
+
     with right_col:
         st.markdown("### 📝 트레이딩 룸 매매 일지")
         memo_data = db.get_memo(selected_date_str, ticker)
@@ -297,8 +315,6 @@ if target_row is not None:
     st.markdown("---")
     st.markdown("### 📊 대한민국 실시간 종합 차트 멀티 피드")
 
-    # 💡 [구조 최종 타협 및 정립] iframe 차단 원천 우회를 위해 
-    # 네이버가 외부 링크 배포를 무조건 허용해 둔 순수 다크 캔들 차트 스트림 스냅샷 주소로 고정합니다.
     chart_tabs = st.tabs(["📊 실시간 일봉 차트", "📊 실시간 주봉 차트", "📊 실시간 월봉 차트"])
 
     with chart_tabs[0]:
