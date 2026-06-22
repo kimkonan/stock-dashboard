@@ -280,9 +280,8 @@ if target_row is not None:
                         <div id="tv_{ticker}_{current_interval}" style="height:100%;"></div>
                     </div>
                     """
-                    # 🚨 문법 충돌 우려를 우회하여 고유 고정 키 할당
-                    widget_key = f"tv_widget_{ticker}_{current_interval}"
-                    st.components.v1.html(tradingview_html, height=410, key=widget_key)
+                    # 🚨 문법 충돌 여지를 완벽히 제거하기 위해 index 기반 문자열 조합으로 key 변경
+                    st.components.v1.html(tradingview_html, height=410, key=f"tv_chart_tab_{idx}")
                     
         with chart_tab2:
             st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True)
