@@ -3,7 +3,31 @@ import pandas as pd
 from datetime import datetime, date
 import os
 
-# 모듈 클래스 로드
+# ==========================================
+# 🔐 고유키(비밀번호) 인증 시스템 (무단 사용자 차단)
+# ==========================================
+VALID_KEYS = ["trader777", "secret99", "goldpass"]
+
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+
+if not st.session_state["authenticated"]:
+    st.title("🔒 PRO 급등주 대시보드 로그인")
+    st.markdown("본 시스템은 허가된 사용자만 이용할 수 있습니다. 발급받은 고유키를 입력하세요.")
+    
+    user_key = st.text_input("고유 라이선스 키 입력", type="password", placeholder="Access Key를 입력하세요.")
+    if st.button("인증하기", use_container_width=True):
+        if user_key in VALID_KEYS:
+            st.session_state["authenticated"] = True
+            st.success("인증 성공! 대시보드를 로드합니다.")
+            st.rerun()
+        else:
+            st.error("올바르지 않은 고유키입니다. 발급자에게 문의하세요.")
+    st.stop()
+
+# ==========================================
+# 📊 메인 시스템 모듈 로드 및 초기화
+# ==========================================
 from database import DatabaseManager
 from crawler import NaverFinanceCrawler
 from news_analyzer import KeywordNewsAnalyzer
@@ -158,7 +182,6 @@ if target_row is not None:
     price = target_row['price']
     volume = target_row['volume']
     
-    # 디테일 정보 보정 및 데이터 덮어쓰기 유도
     if not target_row.get('industry') or "데이터 갱신" in str(target_row.get('market_cap', '')):
         with st.spinner("기업 상세 정보 인코딩 정밀 갱신 중..."):
             details = crawler.fetch_stock_details(ticker)
@@ -178,7 +201,6 @@ if target_row is not None:
     inferred_reason = analyzer.analyze_reasons(cached_news)
     intensity_score = ScoringEngine.calculate_momentum_score(change_rate, volume, len(cached_news))
 
-    # 화면 분할 (1.1 : 0.9 비율로 최적화)
     left_col, right_col = st.columns([1.1, 0.9])
     
     with left_col:
@@ -221,7 +243,7 @@ if target_row is not None:
         
         st.markdown("### 📰 관련 뉴스 타임라인")
         if cached_news:
-            for idx, n in enumerate(cached_news[:10], 1): # 중요한 뉴스 10개만 간결히 표기
+            for idx, n in enumerate(cached_news[:10], 1):
                 st.markdown(f"**{idx}** . [{n['title']}]({n['url']}) <span style='color:#7f8c8d; font-size:11px;'>{n['press']} | {n['pub_date']}</span>", unsafe_allow_html=True)
         else:
             st.caption("특징 뉴스가 아직 로드되지 않았거나 존재하지 않습니다.")
@@ -251,13 +273,14 @@ if target_row is not None:
                           "enable_publishing": false,
                           "hide_side_toolbar": false,
                           "allow_symbol_change": true,
-                          "container_id": "tv_{intervals[idx]}"
+                          "container_id": "tv_{ticker}_{intervals[idx]}"
                         }});
                         </script>
-                        <div id="tv_{intervals[idx]}" style="height:100%;"></div>
+                        <div id="tv_{ticker}_{intervals[idx]}" style="height:100%;"></div>
                     </div>
                     """
-                    st.components.v1.html(tradingview_html, height=410)
+                    # 🚨 key 속성을 완벽히 분리 고정하여 종목 변경 시 강제 리프레시 유도
+                    st.components.v1.html(tradingview_html, height=410, key=f"tv_widget_{ticker}_{intervals[idx]}")
                     
         with chart_tab2:
             st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True)
