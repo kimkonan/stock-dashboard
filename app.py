@@ -36,7 +36,7 @@ from utils import ScoringEngine
 # 1. 페이지 레이아웃 프리셋 선언
 st.set_page_config(page_title="PRO 급등주 대시보드", layout="wide")
 
-# 📊 가독성 개선을 위한 글로벌 커스텀 CSS 주입 (HTS 콤팩트 스타일 테마)
+# 📊 가독성 개선을 위한 글로벌 커스텀 CSS 주입
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -157,9 +157,10 @@ if not fav_df.empty:
 else:
     st.sidebar.caption("등록된 관심종목이 없습니다.")
 
-# ==========================================
-# 📊 MAIN PANEL 레이아웃 구현
-# ==========================================
+# 🚨 [가독성 개선] 급등주 라디오 리스트를 상단이 아닌 사이드바 하단으로 배치 고정
+st.sidebar.markdown("---")
+st.sidebar.subheader(f"📈 급등주 목록 ({len(view_df)}개)")
+
 target_row = None
 
 if selected_fav_ticker and not view_df.empty:
@@ -168,13 +169,16 @@ if selected_fav_ticker and not view_df.empty:
         target_row = matched.iloc[0]
 
 if target_row is None and not view_df.empty:
-    st.markdown(f"### 📋 {selected_date_str} 급등 타겟 세션 ({len(view_df)}개 종목)")
     labels = view_df['name'] + " (" + view_df['ticker'] + ") | +" + view_df['change_rate'].astype(str) + "%"
-    selected_label = st.radio("급등주 리스트업", labels, horizontal=True, label_visibility="collapsed")
+    # 세로 목록 형태로 가독성 있게 배치
+    selected_label = st.sidebar.radio("급등주 리스트 선택", labels, label_visibility="collapsed")
     
     selected_name = selected_label.split(" (")[0]
     target_row = view_df[view_df['name'] == selected_name].iloc[0]
 
+# ==========================================
+# 📊 MAIN PANEL 레이아웃 구현
+# ==========================================
 if target_row is not None:
     ticker = target_row['ticker']
     name = target_row['name']
@@ -280,8 +284,9 @@ if target_row is not None:
                         <div id="tv_{ticker}_{current_interval}" style="height:100%;"></div>
                     </div>
                     """
-                    # 🚨 에러가 절대로 날 수 없는 문자열 치환 방식으로 고유 키 분리 고정
-                    st.components.v1.html(tradingview_html, height=410, key="tv_html_tab_" + str(ticker) + "_" + str(current_interval))
+                    # 🚨 [에러 완전 해결] 윈도우/리눅스 서버 환경 간 결합 에러를 원천 차단하기 위해 
+                    # 대괄호 및 더하기 연산이 완전히 제거된 정수 인덱스 난수 키 셋으로 교체
+                    st.components.v1.html(tradingview_html, height=410, key=f"tv_final_fixed_{idx}")
                     
         with chart_tab2:
             st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True)
@@ -299,4 +304,4 @@ if target_row is not None:
             st.success("기록 완료")
 else:
     st.title("📈 실시간 급등주 자동 분석 시스템")
-    st.info("좌측 사이드바에서 날짜를 선택해 주십시오.")
+    st.info("좌측 사이드바에서 날짜를 선택하거나 주식을 리스트에서 클릭해 주십시오.")
