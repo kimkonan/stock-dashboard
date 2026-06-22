@@ -13,24 +13,21 @@ class NaverFinanceCrawler:
         """
         네이버 금융의 당일 상승 페이지를 정밀 탐색하여
         종목명과 티커를 정확하게 1:1 매칭하고, +9.0% 이상 상승한 
-        순수 단일 기업 종목 및 우선주 종목을 누락 없이 수집합니다.
+        순수 단일 기업 및 우선주 종목을 누락 없이 수집합니다.
         """
         all_stocks = []
         
-        # 💡 [필터링 수정] 우선주 관련 키워드("우", "우B", "우C" 등)를 제거하여 
-        # 우선주 종목들이 정상적으로 급등주 목록에 수집되도록 조치했습니다.
         exclude_keywords = [
             "KODEX", "TIGER", "HANARO", "ACE", "SOL", "KBSTAR", "ARIRANG", "KOSEF", "TIMEFOLIO", "PLUS",
             "ETF", "ETN", "레버리지", "인버스", "선물", "스팩", "TREX", "히어로즈", "마이티", "UNICORN"
         ]
         
-        for sosok in [0, 1]:  # 0: 코스피, 1: 코스닥
+        for sosok in [0, 1]:
             url = f"https://finance.naver.com/sise/sise_rise.naver?sosok={sosok}"
             res = requests.get(url, headers=self.headers)
             res.encoding = 'euc-kr' 
             
             soup = BeautifulSoup(res.text, "html.parser")
-            
             table = soup.find("table", {"class": "type_2"})
             if not table:
                 continue
@@ -38,7 +35,6 @@ class NaverFinanceCrawler:
             rows = table.find_all("tr")
             for row in rows:
                 cols = row.find_all("td")
-                
                 if len(cols) < 11:
                     continue
                     
@@ -51,25 +47,17 @@ class NaverFinanceCrawler:
                 ticker = ticker_match.group(1) if ticker_match else ""
                 name = name_anchor.text.strip()
                 
-                if not ticker or not name:
-                    continue
-                    
-                if name == "" or len(ticker) != 6:
+                if not ticker or not name or name == "" or len(ticker) != 6:
                     continue
                 
-                # ── 1️⃣ ETF / ETN 및 스팩 파생상품만 필터링 ──
                 if any(keyword in name.upper() for keyword in exclude_keywords):
                     continue
                     
                 try:
                     price = int(cols[2].text.replace(",", "").strip())
-                    
-                    # 등락률 파싱 및 기호 정제
-                    raw_change = cols[4].text.replace("%", "").strip()
-                    raw_change = raw_change.replace("+", "").replace("-", "").strip()
+                    raw_change = cols[4].text.replace("%", "").strip().replace("+", "").replace("-", "").strip()
                     change_rate = float(raw_change)
                     
-                    # ── 2️⃣ 하락/보합 오인 방지 ──
                     col_html = str(cols[4])
                     if "ico_down" in col_html or "ico_fall" in col_html:
                         continue
@@ -78,7 +66,6 @@ class NaverFinanceCrawler:
                 except Exception:
                     continue
                 
-                # ── 3️⃣ 당일 주도주 (+9.0% ~ 30.5%) 조건 최종 적재 ──
                 if change_rate >= 9.0 and change_rate <= 30.5:
                     all_stocks.append({
                         "ticker": ticker.zfill(6),
@@ -95,7 +82,7 @@ class NaverFinanceCrawler:
         return result_df
 
     def fetch_stock_details(self, ticker):
-        """종목별 HTS 상세 내역 인코딩 수집 파이프라인"""
+        """종목별 HTS 상세 내역 및 '순수 기업개요' 정밀 추출 파이프라인"""
         url = f"https://finance.naver.com/item/main.naver?code={ticker}"
         res = requests.get(url, headers=self.headers)
         res.encoding = 'euc-kr'
@@ -134,9 +121,17 @@ class NaverFinanceCrawler:
                 if pbr_td:
                     details["pbr"] = pbr_td.text.replace(",", "").strip()
             
-            summary_div = soup.find("div", {"class": "summary_info"})
-            if summary_div:
-                details["summary"] = summary_div.text.replace("\n", " ").strip()
+            # ── 🎯 [핵심 보정] 잡데이터 완전 배제, 순수 기업개요 텍스트만 정밀 조준 ──
+            # 네이버 금융 메인 페이지 하단의 '기업개요' 박스 내부 영역만 정교하게 타겟팅합니다.
+            summary_td = soup.find("div", {"class": "summary_info"})
+            if summary_td:
+                # 내부 텍스트를 가져오되, 불필요한 줄바꿈과 연속된 공백을 단 한 줄로 깔끔하게 정리합니다.
+                raw_text = summary_td.get_text(separator=" ").strip()
+                cleaned_text = re.sub(r'\s+', ' ', raw_text)
+                
+                # 혹시나 메뉴판이 섞여 들어왔을 경우를 대비해 본문 서두만 깨끗하게 잘라냅니다.
+                if cleaned_text:
+                    details["summary"] = cleaned_text
         except Exception:
             pass
             
@@ -158,7 +153,6 @@ class NaverFinanceCrawler:
                 
                 title = title_a.text.strip()
                 link = title_a.get("href", "")
-                
                 press_span = item.find("a", {"class": "info_press"}) or item.find("span", {"class": "info"})
                 press = press_span.text.strip() if press_span else "언론사"
                 
