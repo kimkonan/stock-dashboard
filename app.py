@@ -4,7 +4,7 @@ from datetime import datetime, date
 import os
 
 # ==========================================
-# 🔐 고유키(비밀번호) 인증 시스템 (konan0401 완벽 반영)
+# 🔐 고유키(비밀번호) 인증 시스템 (konan0401 반영)
 # ==========================================
 VALID_KEYS = ["trader777", "secret99", "goldpass", "konan0401"]
 
@@ -36,7 +36,7 @@ from utils import ScoringEngine
 # 1. 페이지 레이아웃 프리셋 선언
 st.set_page_config(page_title="PRO 급등주 대시보드", layout="wide")
 
-# 📊 가독성 개선을 위한 글로벌 커스텀 CSS 주입
+# 📊 가독성 및 대형 차트 레이아웃 최적화를 위한 CSS 주입
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -59,7 +59,7 @@ st.markdown("""
             font-weight: 600 !important;
             border-left: 4px solid #ff4b4b;
             padding-left: 8px;
-            margin-top: 1rem !important;
+            margin-top: 1.2rem !important;
             margin-bottom: 0.8rem !important;
         }
         .stMetric {
@@ -75,9 +75,6 @@ st.markdown("""
         [data-testid="stMetricLabel"] {
             font-size: 0.85rem !important;
             color: #a0aec0 !important;
-        }
-        .stTextArea textarea {
-            font-size: 0.9rem !important;
         }
         .company-summary {
             background-color: #141923;
@@ -203,7 +200,8 @@ if target_row is not None:
     inferred_reason = analyzer.analyze_reasons(cached_news)
     intensity_score = ScoringEngine.calculate_momentum_score(change_rate, volume, len(cached_news))
 
-    left_col, right_col = st.columns([1.1, 0.9])
+    # 🏢 상단 영역: 정보 분석과 매매 일지를 반반 레이아웃으로 균형 있게 배치
+    left_col, right_col = st.columns([1.0, 1.0])
     
     with left_col:
         title_sub_col1, title_sub_col2 = st.columns([3, 1])
@@ -245,46 +243,44 @@ if target_row is not None:
         
         st.markdown("### 📰 관련 뉴스 타임라인")
         if cached_news:
-            for idx, n in enumerate(cached_news[:10], 1):
+            for idx, n in enumerate(cached_news[:6], 1):  # 균형을 위해 상단 노출 뉴스 6개 조절
                 st.markdown(f"**{idx}** . [{n['title']}]({n['url']}) <span style='color:#7f8c8d; font-size:11px;'>{n['press']} | {n['pub_date']}</span>", unsafe_allow_html=True)
         else:
             st.caption("특징 뉴스가 아직 로드되지 않았거나 존재하지 않습니다.")
 
     with right_col:
-        st.markdown("### 📊 멀티 타임프레임 차트 피드")
-        
-        # 🔗 메인 탭 2개로 완벽 분리 교환
-        chart_tab1, chart_tab2 = st.tabs(["TradingView 실시간 라이브 차트", "네이버 금융 차트 스냅샷"])
-        
-        with chart_tab1:
-            period_tabs = st.tabs(["실시간 일봉", "실시간 주봉", "실시간 월봉"])
-            
-            # 💡 정밀 추적 완료: 문자열 포맷팅 오류 소지를 지우고 'KRX' 거래소 접두사를 확실하게 주입한 뷰어 주소
-            with period_tabs[0]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol=KRX:{ticker}&interval=D&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
-                
-            with period_tabs[1]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol=KRX:{ticker}&interval=W&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
-                
-            with period_tabs[2]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol=KRX:{ticker}&interval=M&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
-                    
-        with chart_tab2:
-            st.markdown("#### 📈 네이버 금융 기준 당일 거래 현황")
-            # 되살리기 완료: 우측 탭 클릭 시 표시될 고해상도 종가 캔들 스냅샷 이미지
-            st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True, caption="당일 기준 정밀 캔들 스냅샷")
-
         st.markdown("### 📝 트레이딩 룸 매매 일지")
         memo_data = db.get_memo(selected_date_str, ticker)
         
-        buy_reason = st.text_area("매수 이유 및 타점 관점", value=memo_data['buy_reason'], height=65)
-        sell_reason = st.text_area("매도 및 분할 익절/손절가", value=memo_data['sell_reason'], height=65)
-        review = st.text_area("매매 관점 복기", value=memo_data['review'], height=65)
-        free_memo = st.text_area("자유 분석 메모", value=memo_data['free_memo'], height=65)
+        buy_reason = st.text_area("매수 이유 및 타점 관점", value=memo_data['buy_reason'], height=90)
+        sell_reason = st.text_area("매도 및 분할 익절/손절가", value=memo_data['sell_reason'], height=90)
+        review = st.text_area("매매 관점 복기", value=memo_data['review'], height=90)
+        free_memo = st.text_area("자유 분석 메모", value=memo_data['free_memo'], height=90)
         
         if st.button("💾 매매 일지 기록 저장", use_container_width=True):
             db.save_memo(selected_date_str, ticker, buy_reason, sell_reason, review, free_memo)
             st.success("기록 완료")
+
+    # ==========================================
+    # 📉 하단 배치: 대형 멀티 타임프레임 차트 피드 (Full Width)
+    # ==========================================
+    st.markdown("---")
+    st.markdown("### 📊 대한민국 실시간 종합 차트 멀티 피드")
+    
+    chart_tabs = st.tabs(["네이버 실시간 일봉 차트실", "네이버 실시간 주봉 차트실", "네이버 실시간 월봉 차트실"])
+    
+    # 보안 프레임 우회를 완벽하게 충족하며 화면에 꽉 찬 560px 높이의 네이버 공식 대형 실시간 차트실 연동
+    with chart_tabs[0]:
+        st.iframe(f"https://finance.naver.com/item/fchart.naver?code={ticker}", height=560, scrolling=True)
+        
+    with chart_tabs[1]:
+        # 주봉 스냅샷 대용 실시간 금융 이미지 뷰어 서브 연동 포함
+        st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/week/{ticker}.png", use_container_width=True, caption="주봉 종합 분석 흐름")
+        
+    with chart_tabs[2]:
+        # 월봉 스냅샷 대용 실시간 금융 이미지 뷰어 서브 연동 포함
+        st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/month/{ticker}.png", use_container_width=True, caption="월봉 장기 추세 흐름")
+
 else:
     st.title("📈 실시간 급등주 자동 분석 시스템")
     st.info("좌측 사이드바에서 날짜를 선택하거나 주식을 리스트에서 클릭해 주십시오.")
