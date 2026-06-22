@@ -1,7 +1,7 @@
 import streamlit as st
 
 # ============================================================
-# ✅ 페이지 설정 - 최상단 고정 (모든 st 호출 및 임포트보다 먼저 실행)
+# ✅ 페이지 설정 - 파일 최상단 고정 (모든 st 호출 및 임포트보다 먼저 실행)
 # ============================================================
 st.set_page_config(
     page_title="PRO 급등주 대시보드",
@@ -224,7 +224,7 @@ if target_row is not None:
     left_col, right_col = st.columns([1.2, 0.8])
 
     with left_col:
-        # ── [요청 완벽 반영] 당일 종가 차트 스냅샷을 왼쪽 상단 메인 영역에 확실히 고정 ──
+        # ── 당일 종가 차트 스냅샷 상단 배치 고정 ──
         st.markdown("### 📉 네이버 금융 기준 당일 거래 현황")
         st.image(
             "https://ssl.pstatic.net/imgfinance/chart/item/candle/day/" + ticker + ".png", 
@@ -291,33 +291,30 @@ if target_row is not None:
             st.success("기록 완료")
 
     # ============================================================
-    # 📉 하단 배치: 대형 멀티 타임프레임 차트 피드 (순수 차트만 확대 적용)
+    # 📉 하단 배치: 순수 차트실 전용 단독 송출 주소 적용 (Full Width)
     # ============================================================
     st.markdown("---")
     st.markdown("### 📊 대한민국 실시간 종합 차트 멀티 피드")
 
-    # 💡 [구조 최종 정립] 상단 광고 및 포털 메뉴판을 프레임 바깥으로 완전히 밀어내고
-    # 오직 내부 캔들 차트실 본체만 시원하게 채워주는 제어 파라미터(&width=100%&height=100%) 주입 완료
-    _base_url = "https://finance.naver.com/item/fchart.naver?code=" + ticker + "&width=100%&height=100%"
+    # 💡 순수 차트 전용 임베드 소스(fchart_in.naver)로 교체 완료
+    _base_url = "https://finance.naver.com/item/fchart_in.naver?code=" + ticker
     IFRAME_W  = "100%"
-    IFRAME_H  = "600" # 차트를 더 큼직하게 보기 위해 내부 프레임 높이 확대
+    IFRAME_H  = "500"
 
-    iframe_daily   = '<iframe src="' + _base_url + '&expr=1" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block; margin-top:-140px;" scrolling="no"></iframe>'
-    iframe_weekly  = '<iframe src="' + _base_url + '&expr=3" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block; margin-top:-140px;" scrolling="no"></iframe>'
-    iframe_monthly = '<iframe src="' + _base_url + '&expr=5" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block; margin-top:-140px;" scrolling="no"></iframe>'
+    iframe_daily   = '<iframe src="' + _base_url + '&expr=1" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block;" scrolling="no"></iframe>'
+    iframe_weekly  = '<iframe src="' + _base_url + '&expr=3" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block;" scrolling="no"></iframe>'
+    iframe_monthly = '<iframe src="' + _base_url + '&expr=5" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block;" scrolling="no"></iframe>'
 
     chart_tabs = st.tabs(["실시간 일봉 차트실", "실시간 주봉 차트실", "실시간 월봉 차트실"])
 
-    # margin-top 상단 여백 역연산을 통해 불필요한 포털 헤더 영역을 완전히 가리고 순수 차트만 꽉 차게 노출시킵니다.
     with chart_tabs[0]:
-        components.html(iframe_daily, height=480, scrolling=False)
+        components.html(iframe_daily, height=515, scrolling=False)
 
     with chart_tabs[1]:
-        components.html(iframe_weekly, height=480, scrolling=False)
+        components.html(iframe_weekly, height=515, scrolling=False)
 
     with chart_tabs[2]:
-        components.html(iframe_monthly, height=480, scrolling=False)
+        components.html(iframe_monthly, height=515, scrolling=False)
 
 else:
-    st.title("📈 실시간 급등주 자동 분석 시스템")
-    st.info("좌측 사이드바에서 날짜를 선택하거나 주식을 리스트에서 클릭해 주십시오.")
+    st.title("📈 실시간 급
