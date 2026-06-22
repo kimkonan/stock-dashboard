@@ -83,10 +83,11 @@ class NaverFinanceCrawler:
 
     def fetch_stock_details(self, ticker):
         """종목별 HTS 상세 내역 및 '순수 기업개요' 정밀 추출 파이프라인"""
-        url = f"https://finance.naver.com/item/main.naver?code={ticker}"
-        res = requests.get(url, headers=self.headers)
-        res.encoding = 'euc-kr'
-        soup = BeautifulSoup(res.text, "html.parser")
+        # 지표와 업종은 메인 페이지에서 파싱
+        url_main = f"https://finance.naver.com/item/main.naver?code={ticker}"
+        res_main = requests.get(url_main, headers=self.headers)
+        res_main.encoding = 'euc-kr'
+        soup_main = BeautifulSoup(res_main.text, "html.parser")
         
         details = {
             "industry": "N/A",
@@ -97,7 +98,7 @@ class NaverFinanceCrawler:
         }
         
         try:
-            h4_tags = soup.find_all("h4")
+            h4_tags = soup_main.find_all("h4")
             for h4 in h4_tags:
                 if "업종명" in h4.text:
                     anchor = h4.find_next("a")
@@ -105,33 +106,40 @@ class NaverFinanceCrawler:
                         details["industry"] = anchor.text.strip()
                         break
             
-            cap_em = soup.find("em", {"id": "_market_sum"})
+            cap_em = soup_main.find("em", {"id": "_market_sum"})
             if cap_em:
                 details["market_cap"] = cap_em.text.replace("\n", "").replace("\t", "").strip() + "억원"
                 
-            per_th = soup.find("th", text="PER")
+            per_th = soup_main.find("th", text="PER")
             if per_th:
                 per_td = per_th.find_next("td")
                 if per_td:
                     details["per"] = per_td.text.replace(",", "").strip()
                     
-            pbr_th = soup.find("th", text="PBR")
+            pbr_th = soup_main.find("th", text="PBR")
             if pbr_th:
                 pbr_td = pbr_th.find_next("td")
                 if pbr_td:
                     details["pbr"] = pbr_td.text.replace(",", "").strip()
             
-            # ── 🎯 [핵심 보정] 잡데이터 완전 배제, 순수 기업개요 텍스트만 정밀 조준 ──
-            # 네이버 금융 메인 페이지 하단의 '기업개요' 박스 내부 영역만 정교하게 타겟팅합니다.
-            summary_td = soup.find("div", {"class": "summary_info"})
-            if summary_td:
-                # 내부 텍스트를 가져오되, 불필요한 줄바꿈과 연속된 공백을 단 한 줄로 깔끔하게 정리합니다.
-                raw_text = summary_td.get_text(separator=" ").strip()
+            # ── 🎯 [경로 전면 수정] 기업분석 전용 페이지에서 진짜 '기업개요' 텍스트만 추출 ──
+            url_coinfo = f"https://finance.naver.com/item/coinfo.naver?code={ticker}"
+            res_coinfo = requests.get(url_coinfo, headers=self.headers)
+            res_coinfo.encoding = 'euc-kr'
+            soup_coinfo = BeautifulSoup(res_coinfo.text, "html.parser")
+            
+            # coinfo 페이지 내에서 summary 정보가 담긴 클래스 정밀 타겟팅
+            summary_div = soup_coinfo.find("div", {"class": "summary_info"}) or soup_coinfo.find("td", {"class": "txt"})
+            if summary_div:
+                raw_text = summary_div.get_text(separator=" ").strip()
                 cleaned_text = re.sub(r'\s+', ' ', raw_text)
-                
-                # 혹시나 메뉴판이 섞여 들어왔을 경우를 대비해 본문 서두만 깨끗하게 잘라냅니다.
                 if cleaned_text:
                     details["summary"] = cleaned_text
+            else:
+                # 대안 서치: p 태그나 summary용 id 내부 텍스트 추적
+                p_desc = soup_coinfo.find("p", {"class": "description"})
+                if p_desc:
+                    details["summary"] = p_desc.get_text().strip()
         except Exception:
             pass
             
