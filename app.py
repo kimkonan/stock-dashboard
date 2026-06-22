@@ -257,41 +257,17 @@ if target_row is not None:
         
         with chart_tab1:
             period_tabs = st.tabs(["일봉", "주봉", "월봉"])
-            intervals = ["D", "W", "M"]
             
-            # 🚨 [해결책] 루프 내 연산을 버리고, 각 탭 컴포넌트에 완전 고정된 텍스트 키(Static String Key)를 주입
+            # 🚨 [최종 해결책] 에러를 내던 st.components.v1.html 연산 방식을 폐기하고,
+            # Streamlit이 자체 지원하는 범용 iframe 뷰어(st.iframe) 구조로 100% 안전하게 전면 교체
             with period_tabs[0]:
-                html_d = f"""
-                <div style="height:400px;">
-                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-                    <script type="text/javascript">
-                    new TradingView.widget({{"autosize": true, "symbol": "KRX:{ticker}", "interval": "D", "timezone": "Asia/Seoul", "theme": "dark", "style": "1", "locale": "ko", "container_id": "tv_d"}});
-                    </script>
-                    <div id="tv_d" style="height:100%;"></div>
-                </div>"""
-                st.components.v1.html(html_d, height=410, key="fixed_key_day_chart")
+                st.iframe(f"https://s.tradingview.com/widgetembed/?frameElementId=tradingview_76747&symbol=KRX:{ticker}&interval=D&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1&timezone=Asia%2FSeoul&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=ko", height=410)
                 
             with period_tabs[1]:
-                html_w = f"""
-                <div style="height:400px;">
-                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-                    <script type="text/javascript">
-                    new TradingView.widget({{"autosize": true, "symbol": "KRX:{ticker}", "interval": "W", "timezone": "Asia/Seoul", "theme": "dark", "style": "1", "locale": "ko", "container_id": "tv_w"}});
-                    </script>
-                    <div id="tv_w" style="height:100%;"></div>
-                </div>"""
-                st.components.v1.html(html_w, height=410, key="fixed_key_week_chart")
+                st.iframe(f"https://s.tradingview.com/widgetembed/?frameElementId=tradingview_76747&symbol=KRX:{ticker}&interval=W&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1&timezone=Asia%2FSeoul&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=ko", height=410)
                 
             with period_tabs[2]:
-                html_m = f"""
-                <div style="height:400px;">
-                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-                    <script type="text/javascript">
-                    new TradingView.widget({{"autosize": true, "symbol": "KRX:{ticker}", "interval": "M", "timezone": "Asia/Seoul", "theme": "dark", "style": "1", "locale": "ko", "container_id": "tv_m"}});
-                    </script>
-                    <div id="tv_m" style="height:100%;"></div>
-                </div>"""
-                st.components.v1.html(html_m, height=410, key="fixed_key_month_chart")
+                st.iframe(f"https://s.tradingview.com/widgetembed/?frameElementId=tradingview_76747&symbol=KRX:{ticker}&interval=M&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=dark&style=1&timezone=Asia%2FSeoul&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=ko", height=410)
                     
         with chart_tab2:
             st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True)
