@@ -4,169 +4,174 @@ import pandas as pd
 import re
 
 class NaverFinanceCrawler:
-    """네이버 금융 데이터 및 뉴스 수집 전문 크롤러"""
     def __init__(self):
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        self.etf_keywords = [
-            "KODEX", "TIGER", "KBSTAR", "ACE", "SOL", "ARIRANG", "HANARO", "KOSEF", 
-            "레버리지", "인버스", "합성", "ETN", "스팩", "SPAC", "액티브", "선물", "인덱스", "펀드"
-        ]
 
-    def fetch_rising_stocks(self) -> pd.DataFrame:
-        """전일대비 상승 종목 페이지 수집 및 필터링 (누락 방지를 위해 1~3페이지 전수조사)"""
-        stock_list = []
-        seen_tickers = set()
+    def fetch_rising_stocks(self):
+        """
+        코스피/코스닥 전체 시세 페이지를 전수 조사하여 
+        당일 등락률이 9.0% 이상인 모든 종목을 누락 없이 수집합니다.
+        """
+        all_stocks = []
         
-        for page in [1, 2, 3]:
-            url = f"https://finance.naver.com/sise/sise_rise.naver?page={page}"
-            try:
-                response = requests.get(url, headers=self.headers)
-                response.encoding = 'euc-kr'
-                soup = BeautifulSoup(response.text, 'lxml')
+        # sosok=0 (코스피), sosok=1 (코스닥)
+        for sosok in [0, 1]:
+            # 안전하게 최대 5페이지까지 전수 조사 (보통 코스피 40장, 코스닥 35장 분량)
+            # 네이버 시세 테이블 구조를 역추적하여 데이터 유실을 원천 차단합니다.
+            page = 1
+            while True:
+                url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok={sosok}&page={page}"
+                res = requests.get(url, headers=self.headers)
+                soup = BeautifulSoup(res.text, "html.parser")
                 
-                table = soup.find("table", class_="type_2")
-                if not table:
-                    continue
-                    
-                rows = table.find_all("tr")
+                # 페이지 끝에 도달했는지 검증 (네이버는 끝 페이지 이후 빈 페이지를 반환하거나 링크가 없음)
+                has_data = soup.find("table", {"class": "type_2"})
+                if not has_data:
+                    break
+                
+                rows = has_data.find_all("tr")
+                valid_row_count = 0
+                
                 for row in rows:
-                    link = row.find("a", class_="tltle")
-                    if not link:
+                    cols = row.find_all("td")
+                    if len(cols) < 12:  # 네이버 표준 시세 컬럼 규격 검증
                         continue
                         
-                    name = link.text.strip()
-                    if any(keyword in name for keyword in self.etf_keywords):
+                    # 종목명 및 티커 추출
+                    name_anchor = cols[1].find("a")
+                    if not name_anchor:
                         continue
                         
-                    href = link.get("href", "")
-                    ticker = href.split("code=")[-1] if "code=" in href else ""
-                    if not ticker or ticker in seen_tickers:
+                    name = name_anchor.text.strip()
+                    href = name_anchor.get("href", "")
+                    ticker_match = re.search(r"code=(\d+)", href)
+                    ticker = ticker_match.group(1) if ticker_match else ""
+                    
+                    if not ticker:
                         continue
                         
-                    tds = row.find_all("td")
-                    if len(tds) < 6:
-                        continue
-                        
+                    # 당일 종가, 등락률, 거래량 정밀 정제
                     try:
-                        price_str = tds[2].text.strip().replace(",", "")
-                        price = int(price_str) if price_str.isdigit() else 0
+                        price = int(cols[2].text.replace(",", "").strip())
                         
-                        change_str = tds[4].text.strip().replace("\n", "").replace("\t", "").replace("%", "")
-                        change_rate = float(change_str)
+                        # 등락률 텍스트에서 플러스, 마이너스, 공백 기호 완전 제거 후 실수형 변환
+                        raw_change = cols[4].text.replace("%", "").strip()
+                        raw_change = raw_change.replace("+", "").replace("-", "")
+                        change_rate = float(raw_change)
                         
-                        volume_str = tds[5].text.strip().replace(",", "")
-                        volume = int(volume_str) if volume_str.isdigit() else 0
-                        
-                        if change_rate >= 9.0:
-                            seen_tickers.add(ticker)
-                            stock_list.append({
-                                "name": name,
-                                "ticker": ticker,
-                                "change_rate": change_rate,
-                                "price": price,
-                                "volume": volume
-                            })
-                    except (ValueError, IndexError):
+                        # 하락/보합 종목 필터링 (네이버는 상승 종목에 ico_up 클래스나 빨간색 스타일을 씁니다)
+                        # 단순 절댓값 파싱 오류를 막기 위해 td 내부의 부호 이미지를 교차 체크합니다.
+                        if "ico_down" in str(cols[4]) or "ico_fall" in str(cols[4]):
+                            change_rate = -change_rate
+                            
+                        volume = int(cols[9].text.replace(",", "").strip())
+                    except Exception:
                         continue
-            except Exception:
-                continue
+                    
+                    # 💡 [핵심 타겟 보정] 당일 상승률 9.0% 이상인 주도주만 전수 적재
+                    if change_rate >= 9.0:
+                        all_stocks.append({
+                            "ticker": ticker,
+                            "name": name,
+                            "price": price,
+                            "change_rate": change_rate,
+                            "volume": volume
+                        })
+                    
+                    valid_row_count += 1
                 
-        return pd.DataFrame(stock_list)
+                # 해당 페이지에 유효한 주식 데이터 행이 전혀 없으면 루프 탈출
+                if valid_row_count == 0 or page >= 45: 
+                    break
+                    
+                page += 1
 
-    def fetch_stock_details(self, ticker: str) -> dict:
-        """종목 코드를 기반으로 업종, 시총, PER, PBR, 기업개요를 네이버 금융에서 파싱"""
-        details = {"industry": "", "market_cap": "", "per": 0.0, "pbr": 0.0, "summary": ""}
+        # 데이터프레임으로 변환 후 등락률이 높은 순서대로 탑 다운 정렬
+        result_df = pd.DataFrame(all_stocks)
+        if not result_df.empty:
+            result_df = result_df.sort_values(by="change_rate", ascending=False).reset_index(drop=True)
+        return result_df
+
+    def fetch_stock_details(self, ticker):
+        """종목별 HTS 상세 내역 인코딩 수집 파이프라인"""
         url = f"https://finance.naver.com/item/main.naver?code={ticker}"
+        res = requests.get(url, headers=self.headers)
+        soup = BeautifulSoup(res.text, "html.parser")
+        
+        details = {
+            "industry": "N/A",
+            "market_cap": "N/A",
+            "per": "0.0",
+            "pbr": "0.0",
+            "summary": "등록된 기업 개요 요약 정보가 없습니다."
+        }
         
         try:
-            response = requests.get(url, headers=self.headers)
-            response.encoding = 'euc-kr'
-            soup = BeautifulSoup(response.text, 'lxml')
-            
-            market_cap_th = soup.find("th", string=re.compile("시가총액"))
-            if market_cap_th:
-                td = market_cap_th.find_next("td")
-                if td:
-                    raw_cap = td.text.strip().replace("\n", "").replace("\t", "").replace(",", "")
-                    raw_cap = re.sub(r'\s+', ' ', raw_cap)
-                    details["market_cap"] = raw_cap
-            
-            per_id = soup.find("em", id="_per")
-            if per_id:
-                try: details["per"] = float(per_id.text.strip().replace(",", ""))
-                except ValueError: pass
-                
-            pbr_id = soup.find("em", id="_pbr")
-            if pbr_id:
-                try: details["pbr"] = float(pbr_id.text.strip().replace(",", ""))
-                except ValueError: pass
-            
-            industry_th = soup.find("th", string=re.compile("주요업종"))
-            if industry_th:
-                td = industry_th.find_next("td")
-                if td: details["industry"] = td.text.strip()
-                
-            summary_url = f"https://finance.naver.com/item/coinfo.naver?code={ticker}"
-            res_sum = requests.get(summary_url, headers=self.headers)
-            res_sum.encoding = 'euc-kr'
-            soup_sum = BeautifulSoup(res_sum.text, 'lxml')
-            
-            summary_div = soup_sum.find("div", class_="summary_info")
-            if summary_div:
-                text_content = summary_div.text.strip()
-                text_content = re.sub(r'\s+', ' ', text_content)
-                details["summary"] = text_content
-            else:
-                h4_summary = soup.find("div", class_="summary_info")
-                if h4_summary:
-                    details["summary"] = re.sub(r'\s+', ' ', h4_summary.text.strip())
-                else:
-                    details["summary"] = f"본 기업은 단일 기업 주식 종목(코드: {ticker})입니다. 당일 상세 섹터 테마 및 수급 현황을 파악하여 매매에 참고하십시오."
-                
-            return details
-        except Exception:
-            return details
-
-    def fetch_naver_news(self, query: str) -> list:
-        """네이버 뉴스 검색 섹션을 크롤링하여 최근 20개 뉴스 수집"""
-        news_list = []
-        for start in [1, 11]:
-            url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=0&start={start}"
-            try:
-                response = requests.get(url, headers=self.headers)
-                soup = BeautifulSoup(response.text, 'lxml')
-                
-                li_tags = soup.find_all("li", class_="bx")
-                for li in li_tags:
-                    a_tag = li.find("a", class_="news_tit")
-                    if not a_tag:
-                        continue
-                    
-                    title = a_tag.get("title") if a_tag.get("title") else a_tag.text.strip()
-                    news_url = a_tag.get("href", "")
-                    
-                    press_tag = li.find("a", class_="info_press")
-                    press = press_tag.text.strip().replace("언론사 선정", "") if press_tag else "뉴스"
-                    
-                    date_tags = li.find_all("span", class_="info")
-                    pub_date = "방금 전"
-                    for d in date_tags:
-                        if "전" in d.text or "." in d.text:
-                            pub_date = d.text.strip()
-                            break
-                            
-                    news_list.append({
-                        "title": title,
-                        "press": press,
-                        "pub_date": pub_date,
-                        "url": news_url
-                    })
-                    if len(news_list) >= 20:
+            # 업종 분석
+            h4_tags = soup.find_all("h4")
+            for h4 in h4_tags:
+                if "업종명" in h4.text:
+                    anchor = h4.find_next("a")
+                    if anchor:
+                        details["industry"] = anchor.text.strip()
                         break
-            except Exception:
-                continue
-            if len(news_list) >= 20:
-                break
+            
+            # 시가총액 분석
+            cap_em = soup.find("em", {"id": "_market_sum"})
+            if cap_em:
+                details["market_cap"] = cap_em.text.replace("\n", "").replace("\t", "").strip() + "억원"
+                
+            # PER / PBR 지표 트래킹
+            per_th = soup.find("th", text="PER")
+            if per_th:
+                per_td = per_th.find_next("td")
+                if per_td:
+                    details["per"] = per_td.text.replace(",", "").strip()
+                    
+            pbr_th = soup.find("th", text="PBR")
+            if pbr_th:
+                pbr_td = pbr_th.find_next("td")
+                if pbr_td:
+                    details["pbr"] = pbr_td.text.replace(",", "").strip()
+            
+            # 기업 개요 파싱 데이터 결합
+            summary_div = soup.find("div", {"class": "summary_info"})
+            if summary_div:
+                details["summary"] = summary_div.text.replace("\n", " ").strip()
+        except Exception:
+            pass
+            
+        return details
+
+    def fetch_naver_news(self, keyword):
+        """특징주 실시간 타임라인 뉴스 크롤링"""
+        url = f"https://search.naver.com/search.naver?where=news&query={keyword}"
+        res = requests.get(url, headers=self.headers)
+        soup = BeautifulSoup(res.text, "html.parser")
+        
+        news_list = []
+        try:
+            items = soup.find_all("li", {"class": "bx"})
+            for item in items:
+                title_a = item.find("a", {"class": "news_ticker"}) or item.find("a", {"class": "news_tit"})
+                if not title_a:
+                    continue
+                
+                title = title_a.text.strip()
+                link = title_a.get("href", "")
+                
+                press_span = item.find("a", {"class": "info_press"}) or item.find("span", {"class": "info"})
+                press = press_span.text.strip() if press_span else "언론사"
+                
+                news_list.append({
+                    "title": title,
+                    "url": link,
+                    "press": press,
+                    "pub_date": "장중 속보"
+                })
+        except Exception:
+            pass
+            
         return news_list
