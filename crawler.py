@@ -19,7 +19,6 @@ class NaverFinanceCrawler:
         stock_list = []
         seen_tickers = set()
         
-        # 1페이지부터 3페이지까지 순회하며 상승 종목 대량 수집 (총 150개 타깃)
         for page in [1, 2, 3]:
             url = f"https://finance.naver.com/sise/sise_rise.naver?page={page}"
             try:
@@ -60,7 +59,6 @@ class NaverFinanceCrawler:
                         volume_str = tds[5].text.strip().replace(",", "")
                         volume = int(volume_str) if volume_str.isdigit() else 0
                         
-                        # +9% 이상 상승 조건 필터링
                         if change_rate >= 9.0:
                             seen_tickers.add(ticker)
                             stock_list.append({
