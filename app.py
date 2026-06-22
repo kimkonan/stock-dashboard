@@ -4,7 +4,7 @@ from datetime import datetime, date
 import os
 
 # ==========================================
-# 🔐 고유키(비밀번호) 인증 시스템
+# 🔐 고유키(비밀번호) 인증 시스템 (konan0401 완벽 반영)
 # ==========================================
 VALID_KEYS = ["trader777", "secret99", "goldpass", "konan0401"]
 
@@ -157,7 +157,6 @@ if not fav_df.empty:
 else:
     st.sidebar.caption("등록된 관심종목이 없습니다.")
 
-# 📊 급등주 목록 사이드바 하단 배치
 st.sidebar.markdown("---")
 st.sidebar.subheader(f"📈 급등주 목록 ({len(view_df)}개)")
 
@@ -254,18 +253,26 @@ if target_row is not None:
     with right_col:
         st.markdown("### 📊 멀티 타임프레임 차트 피드")
         
-        # 🚨 [트레이딩뷰 완벽 대체] 에러가 나는 해외 위젯을 완전히 걷어내고, 
-        # 대한민국 주식 최적화 공식 실시간 라이브 대형 차트 컴포넌트로 전면 교체
-        period_tabs = st.tabs(["실시간 일봉", "실시간 주봉", "실시간 월봉"])
+        # 🔗 메인 탭 2개로 완벽 분리 교환
+        chart_tab1, chart_tab2 = st.tabs(["TradingView 실시간 라이브 차트", "네이버 금융 차트 스냅샷"])
         
-        with period_tabs[0]:
-            st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True)
+        with chart_tab1:
+            period_tabs = st.tabs(["실시간 일봉", "실시간 주봉", "실시간 월봉"])
             
-        with period_tabs[1]:
-            st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/week/{ticker}.png", use_container_width=True)
-            
-        with period_tabs[2]:
-            st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/month/{ticker}.png", use_container_width=True)
+            # 💡 정밀 추적 완료: 문자열 포맷팅 오류 소지를 지우고 'KRX' 거래소 접두사를 확실하게 주입한 뷰어 주소
+            with period_tabs[0]:
+                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol=KRX:{ticker}&interval=D&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
+                
+            with period_tabs[1]:
+                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol=KRX:{ticker}&interval=W&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
+                
+            with period_tabs[2]:
+                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol=KRX:{ticker}&interval=M&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
+                    
+        with chart_tab2:
+            st.markdown("#### 📈 네이버 금융 기준 당일 거래 현황")
+            # 되살리기 완료: 우측 탭 클릭 시 표시될 고해상도 종가 캔들 스냅샷 이미지
+            st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True, caption="당일 기준 정밀 캔들 스냅샷")
 
         st.markdown("### 📝 트레이딩 룸 매매 일지")
         memo_data = db.get_memo(selected_date_str, ticker)
