@@ -296,7 +296,7 @@ if target_row is not None:
     st.markdown("---")
     st.markdown("### 📊 대한민국 실시간 종합 차트 멀티 피드")
 
-    # 💡 순수 차트 전용 임베드 소스(fchart_in.naver)로 교체 완료
+    # 순수 차트 전용 임베드 소스(fchart_in.naver) 매핑
     _base_url = "https://finance.naver.com/item/fchart_in.naver?code=" + ticker
     IFRAME_W  = "100%"
     IFRAME_H  = "500"
@@ -316,5 +316,7 @@ if target_row is not None:
     with chart_tabs[2]:
         components.html(iframe_monthly, height=515, scrolling=False)
 
+# ── 종목 미선택 초기 화면 (괄호 및 따옴표 유실 오류 완벽 교정) ──
 else:
-    st.title("📈 실시간 급
+    st.title("📈 실시간 급등주 자동 분석 시스템")
+    st.info("좌측 사이드바에서 날짜를 선택하거나 주식을 리스트에서 클릭해 주십시오.")
