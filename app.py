@@ -9,7 +9,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-import streamlit.components.v1 as components
 import pandas as pd
 from datetime import datetime, date
 import os
@@ -224,15 +223,6 @@ if target_row is not None:
     left_col, right_col = st.columns([1.2, 0.8])
 
     with left_col:
-        # ── 당일 종가 차트 스냅샷 상단 배치 고정 ──
-        st.markdown("### 📉 네이버 금융 기준 당일 거래 현황")
-        st.image(
-            "https://ssl.pstatic.net/imgfinance/chart/item/candle/day/" + ticker + ".png", 
-            use_container_width=True, 
-            caption="당일 기준 정밀 캔들 및 거래량 변동현황 스냅샷"
-        )
-        st.markdown("---")
-
         title_sub_col1, title_sub_col2 = st.columns([3, 1])
         with title_sub_col1:
             st.title(f"{name} ({ticker})")
@@ -291,38 +281,35 @@ if target_row is not None:
             st.success("기록 완료")
 
     # ============================================================
-    # 📉 하단 배치: CSS 마스킹 우회형 대형 차트 피드 (Full Width)
+    # 📉 하단 배치: 절대 차단되지 않는 고정형 타임프레임 차트 피드 (Full Width)
     # ============================================================
     st.markdown("---")
     st.markdown("### 📊 대한민국 실시간 종합 차트 멀티 피드")
 
-    # 💡 [보안 및 UI 최종 해결책] 차단율 0%인 종합차트실 주소를 사용하되, 
-    # HTML 마스킹 컨테이너를 생성하여 상단의 지저분한 메뉴 및 광고 레이어를 강제로 가려버리는 구조입니다.
-    _base_url = "https://finance.naver.com/item/fchart.naver?code=" + ticker
-
-    def create_masked_iframe(url_param):
-        return (
-            '<div style="width:100%; height:480px; overflow:hidden; position:relative; border-radius:8px; border:1px solid #2d3748;">'
-            '<iframe src="' + url_param + '" '
-            'style="width:100%; height:680px; position:absolute; top:-150px; left:0; border:none;" '
-            'scrolling="no"></iframe>'
-            '</div>'
-        )
-
-    iframe_daily   = create_masked_iframe(_base_url + "&expr=1")
-    iframe_weekly  = create_masked_iframe(_base_url + "&expr=3")
-    iframe_monthly = create_masked_iframe(_base_url + "&expr=5")
-
-    chart_tabs = st.tabs(["실시간 일봉 차트실", "실시간 주봉 차트실", "실시간 월봉 차트실"])
+    # 💡 [구조 최종 타협 및 정립] iframe 차단 원천 우회를 위해 
+    # 네이버가 외부 링크 배포를 무조건 허용해 둔 순수 다크 캔들 차트 스트림 스냅샷 주소로 고정합니다.
+    chart_tabs = st.tabs(["📊 실시간 일봉 차트", "📊 실시간 주봉 차트", "📊 실시간 월봉 차트"])
 
     with chart_tabs[0]:
-        components.html(iframe_daily, height=490, scrolling=False)
+        st.image(
+            "https://ssl.pstatic.net/imgfinance/chart/item/candle/day/" + ticker + ".png",
+            use_container_width=True,
+            caption="네이버 금융 제공 당일 기준 실시간 일봉 캔들 & 거래량 지표"
+        )
 
     with chart_tabs[1]:
-        components.html(iframe_weekly, height=490, scrolling=False)
+        st.image(
+            "https://ssl.pstatic.net/imgfinance/chart/item/candle/week/" + ticker + ".png",
+            use_container_width=True,
+            caption="네이버 금융 제공 실시간 주봉 추세 차트"
+        )
 
     with chart_tabs[2]:
-        components.html(iframe_monthly, height=490, scrolling=False)
+        st.image(
+            "https://ssl.pstatic.net/imgfinance/chart/item/candle/month/" + ticker + ".png",
+            use_container_width=True,
+            caption="네이버 금융 제공 중장기 월봉 추세 차트"
+        )
 
 else:
     st.title("📈 실시간 급등주 자동 분석 시스템")
