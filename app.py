@@ -1,7 +1,7 @@
 import streamlit as st
 
 # ============================================================
-# ✅ [1순위 디버깅 적용] 페이지 설정 - 모든 st 호출 및 임포트보다 최상단 위치
+# ✅ 페이지 설정 - 모든 st 호출 및 임포트보다 최상단 위치 (디버깅 완료)
 # ============================================================
 st.set_page_config(
     page_title="PRO 급등주 대시보드",
@@ -15,7 +15,7 @@ from datetime import datetime, date
 import os
 
 # ============================================================
-# 🔐 고유키(비밀번호) 인증 시스템 (konan0401 반영 완료)
+# 🔐 고유키(비밀번호) 인증 시스템 (konan0401 포함)
 # ============================================================
 VALID_KEYS = ["trader777", "secret99", "goldpass", "konan0401"]
 
@@ -41,7 +41,7 @@ if not st.session_state["authenticated"]:
     st.stop()
 
 # ============================================================
-# ✅ 보안 및 자원 최적화: 인증 통과 후에만 무거운 커스텀 모듈 로드
+# ✅ 인증 통과 후에만 외부 커스텀 모듈 로드
 # ============================================================
 from database import DatabaseManager
 from crawler import NaverFinanceCrawler
@@ -190,7 +190,7 @@ else:
 
 st.sidebar.markdown("---")
 
-# ── 급등주 목록 (상단 무너진 가독성을 위해 사이드바 하단으로 이동 및 수직 배치) ──
+# ── 급등주 목록 (사이드바 하단으로 이동 및 수직 배치 완료) ──
 st.sidebar.subheader(f"📈 급등주 목록 ({len(view_df)}개)")
 
 target_row = None
@@ -221,14 +221,13 @@ if target_row is None and not view_df.empty:
 # 📊 MAIN PANEL 레이아웃 구현
 # ============================================================
 if target_row is not None:
-    # 💡 [GPT 디버깅 반영] 문자열 강제 치환 및 앞자리 0패딩 유실 차단 방어막 구축
-    ticker  = str(target_row['ticker']).strip().zfill(6)
+    ticker  = str(target_row['ticker']).strip().zfill(6)  # 앞자리 0 누락 완벽 방지
     name    = str(target_row['name'])
     change_rate = target_row['change_rate']
     price   = target_row['price']
     volume  = target_row['volume']
 
-    # 상세 데이터 비어있거나 구버전일 경우 크롤러 동기화 트리거
+    # 상세 데이터 비어있거나 구버전일 경우 크롤러 동기화
     needs_update = (
         not target_row.get('industry')
         or "데이터 갱신" in str(target_row.get('market_cap', ''))
@@ -255,7 +254,7 @@ if target_row is not None:
         change_rate, volume, len(cached_news)
     )
 
-    # ── 상단 하프 크로스 레이아웃: 정보 분석 열 [1.0] + 매매 일지 열 [1.0] ──
+    # ── 상단 5:5 하프 레이아웃: 정보 분석 열 [1.0] + 매매 일지 열 [1.0] ──
     left_col, right_col = st.columns([1.0, 1.0])
 
     with left_col:
@@ -321,18 +320,20 @@ if target_row is not None:
             st.success("기록 완료")
 
     # ============================================================
-    # 📉 [클로드+GPT 디버깅 합본] 하단 대형 멀티 차트 독립 4개 탭 피드 (Full Width)
+    # 📉 하단 배치: 대형 멀티 타임프레임 순수 차트 4개 탭 피드 (Full Width)
     # ============================================================
     st.markdown("---")
     st.markdown("### 📊 대한민국 실시간 종합 차트 멀티 피드")
 
-    # 💡 정밀 디버깅 해결: f-string % 충돌 및 TypeError를 우회하기 위한 순수 하드코딩 결합 체계 구축
-    _base_url = "https://finance.naver.com/item/fchart.naver?code=" + ticker
-    
-    iframe_daily = '<iframe src="' + _base_url + '&expr=1" width="100%" height="560" style="border:none; display:block;" scrolling="yes"></iframe>'
-    iframe_weekly = '<iframe src="' + _base_url + '&expr=3" width="100%" height="560" style="border:none; display:block;" scrolling="yes"></iframe>'
-    iframe_monthly = '<iframe src="' + _base_url + '&expr=5" width="100%" height="560" style="border:none; display:block;" scrolling="yes"></iframe>'
-    snapshot_url = "https://ssl.pstatic.net/imgfinance/chart/item/candle/day/" + ticker + ".png"
+    # 💡 [요청 반영] 주변 웹 UI를 100% 제거하고 순수 차트만 꽉 차게 띄워주는 네이버 금융 엔진 전용 주소
+    _base_url = "https://fchart.stock.naver.com/candle.nhn?symbol=" + ticker
+    IFRAME_W  = "100%"
+    IFRAME_H  = "560"
+
+    iframe_daily   = '<iframe src="' + _base_url + '&timeFrame=day&count=500" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block;" scrolling="no"></iframe>'
+    iframe_weekly  = '<iframe src="' + _base_url + '&timeFrame=week&count=500" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block;" scrolling="no"></iframe>'
+    iframe_monthly = '<iframe src="' + _base_url + '&timeFrame=month&count=500" width="' + IFRAME_W + '" height="' + IFRAME_H + '" style="border:none; display:block;" scrolling="no"></iframe>'
+    snapshot_url   = "https://ssl.pstatic.net/imgfinance/chart/item/candle/day/" + ticker + ".png"
 
     chart_tabs = st.tabs([
         "📈 실시간 일봉",
@@ -342,19 +343,19 @@ if target_row is not None:
     ])
 
     with chart_tabs[0]:
-        st.caption("▶ 네이버 금융 실시간 일봉 통합 차트실")
+        st.caption("▶ 순수 실시간 일봉 라이브 차트 엔진")
         components.html(iframe_daily, height=575, scrolling=False)
 
     with chart_tabs[1]:
-        st.caption("▶ 네이버 금융 실시간 주봉 통합 차트실")
+        st.caption("▶ 순수 실시간 주봉 라이브 차트 엔진")
         components.html(iframe_weekly, height=575, scrolling=False)
 
     with chart_tabs[2]:
-        st.caption("▶ 네이버 금융 실시간 월봉 통합 차트실")
+        st.caption("▶ 순수 실시간 월봉 라이브 차트 엔진")
         components.html(iframe_monthly, height=575, scrolling=False)
 
     with chart_tabs[3]:
-        st.caption("▶ 네이버 금융 기준 당일 정밀 캔들 변동현황 및 누적 거래량 분성 지표")
+        st.caption("▶ 네이버 금융 기준 당일 정밀 캔들 변동현황 및 누적 거래량 분석 스냅샷")
         st.image(
             snapshot_url,
             use_container_width=True,
