@@ -1,11 +1,22 @@
 import streamlit as st
+
+# ============================================================
+# ✅ [1순위 디버깅 적용] 페이지 설정 - 모든 st 호출 및 임포트보다 최상단 위치
+# ============================================================
+st.set_page_config(
+    page_title="PRO 급등주 대시보드",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+import streamlit.components.v1 as components
 import pandas as pd
 from datetime import datetime, date
 import os
 
-# ==========================================
-# 🔐 고유키(비밀번호) 인증 시스템 (konan0401 반영)
-# ==========================================
+# ============================================================
+# 🔐 고유키(비밀번호) 인증 시스템 (konan0401 반영 완료)
+# ============================================================
 VALID_KEYS = ["trader777", "secret99", "goldpass", "konan0401"]
 
 if "authenticated" not in st.session_state:
@@ -14,8 +25,12 @@ if "authenticated" not in st.session_state:
 if not st.session_state["authenticated"]:
     st.title("🔒 PRO 급등주 대시보드 로그인")
     st.markdown("본 시스템은 허가된 사용자만 이용할 수 있습니다. 발급받은 고유키를 입력하세요.")
-    
-    user_key = st.text_input("고유 라이선스 키 입력", type="password", placeholder="Access Key를 입력하세요.")
+
+    user_key = st.text_input(
+        "고유 라이선스 키 입력",
+        type="password",
+        placeholder="Access Key를 입력하세요."
+    )
     if st.button("인증하기", use_container_width=True):
         if user_key in VALID_KEYS:
             st.session_state["authenticated"] = True
@@ -25,21 +40,21 @@ if not st.session_state["authenticated"]:
             st.error("올바르지 않은 고유키입니다. 발급자에게 문의하세요.")
     st.stop()
 
-# ==========================================
-# 📊 메인 시스템 모듈 로드 및 초기화
-# ==========================================
+# ============================================================
+# ✅ 보안 및 자원 최적화: 인증 통과 후에만 무거운 커스텀 모듈 로드
+# ============================================================
 from database import DatabaseManager
 from crawler import NaverFinanceCrawler
 from news_analyzer import KeywordNewsAnalyzer
 from utils import ScoringEngine
 
-# 1. 페이지 레이아웃 프리셋 선언
-st.set_page_config(page_title="PRO 급등주 대시보드", layout="wide")
-
-# 📊 가독성 및 대형 차트 레이아웃 최적화를 위한 CSS 주입
+# ============================================================
+# 🎨 가독성 및 대형 차트 레이아웃 최적화 CSS 주입
+# ============================================================
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
         html, body, [data-testid="stSidebar"] {
             font-family: 'Inter', -apple-system, sans-serif !important;
         }
@@ -89,7 +104,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. 인스턴스 싱글톤 초기화
+# ⚙️ 싱글톤 인스턴스 초기화
 db = DatabaseManager()
 crawler = NaverFinanceCrawler()
 analyzer = KeywordNewsAnalyzer()
@@ -98,6 +113,7 @@ today_str = datetime.now().strftime("%Y-%m-%d")
 
 @st.cache_data(ttl=600)
 def run_auto_collection(date_key):
+    """당일 급등주 자동 수집 (600초 캐시)"""
     try:
         scraped_df = crawler.fetch_rising_stocks()
         if not scraped_df.empty:
@@ -107,14 +123,19 @@ def run_auto_collection(date_key):
 
 run_auto_collection(today_str)
 
-# ==========================================
-# 📊 SIDEBAR 레이아웃 구현
-# ==========================================
+# ============================================================
+# 📊 SIDEBAR 레이아웃 구현 (가독성 최적화)
+# ============================================================
 st.sidebar.title("⚡ TRADER DASHBOARD")
 st.sidebar.markdown("---")
 
+# ── 날짜 선택 ──
 st.sidebar.subheader("📅 분석 기준일")
-picked_date = st.sidebar.date_input("날짜선택", value=date.today(), label_visibility="collapsed")
+picked_date = st.sidebar.date_input(
+    "날짜선택",
+    value=date.today(),
+    label_visibility="collapsed"
+)
 selected_date_str = picked_date.strftime("%Y-%m-%d")
 
 db_stocks = db.get_stocks_by_date(selected_date_str)
@@ -131,30 +152,45 @@ else:
                 st.rerun()
 
 st.sidebar.markdown("---")
+
+# ── 종목명 / 티커 검색 ──
 st.sidebar.subheader("🔍 종목명 / 티커 검색")
-search_query = st.sidebar.text_input("검색어 입력", value="", placeholder="예: 성문, 014910", label_visibility="collapsed")
+search_query = st.sidebar.text_input(
+    "검색어 입력",
+    value="",
+    placeholder="예: 성문, 014910",
+    label_visibility="collapsed"
+)
 
 view_df = db_stocks.copy()
 if search_query and not view_df.empty:
     view_df = view_df[
-        view_df['name'].str.contains(search_query, case=False) | 
-        view_df['ticker'].str.contains(search_query)
+        view_df['name'].str.contains(search_query, case=False, na=False) |
+        view_df['ticker'].str.contains(search_query, na=False)
     ].reset_index(drop=True)
 
 st.sidebar.markdown("---")
+
+# ── 관심종목 즐겨찾기 ──
 st.sidebar.subheader("⭐ 관심종목 (즐겨찾기)")
 fav_df = db.get_favorites()
 selected_fav_ticker = None
 
 if not fav_df.empty:
     fav_options = fav_df['name'] + " (" + fav_df['ticker'] + ")"
-    selected_fav_box = st.sidebar.selectbox("선택", ["-- 선택 --"] + list(fav_options), label_visibility="collapsed")
+    selected_fav_box = st.sidebar.selectbox(
+        "선택",
+        ["-- 선택 --"] + list(fav_options),
+        label_visibility="collapsed"
+    )
     if selected_fav_box != "-- 선택 --":
-        selected_fav_ticker = selected_fav_box.split("(")[1].replace(")", "")
+        selected_fav_ticker = selected_fav_box.split("(")[1].replace(")", "").strip()
 else:
     st.sidebar.caption("등록된 관심종목이 없습니다.")
 
 st.sidebar.markdown("---")
+
+# ── 급등주 목록 (상단 무너진 가독성을 위해 사이드바 하단으로 이동 및 수직 배치) ──
 st.sidebar.subheader(f"📈 급등주 목록 ({len(view_df)}개)")
 
 target_row = None
@@ -165,31 +201,48 @@ if selected_fav_ticker and not view_df.empty:
         target_row = matched.iloc[0]
 
 if target_row is None and not view_df.empty:
-    labels = view_df['name'] + " (" + view_df['ticker'] + ") | +" + view_df['change_rate'].astype(str) + "%"
-    selected_label = st.sidebar.radio("급등주 리스트 선택", labels, label_visibility="collapsed")
-    
+    labels = (
+        view_df['name']
+        + " ("
+        + view_df['ticker']
+        + ") | +"
+        + view_df['change_rate'].astype(str)
+        + "%"
+    )
+    selected_label = st.sidebar.radio(
+        "급등주 리스트 선택",
+        options=list(labels),
+        label_visibility="collapsed"
+    )
     selected_name = selected_label.split(" (")[0]
     target_row = view_df[view_df['name'] == selected_name].iloc[0]
 
-# ==========================================
+# ============================================================
 # 📊 MAIN PANEL 레이아웃 구현
-# ==========================================
+# ============================================================
 if target_row is not None:
-    ticker = target_row['ticker']
-    name = target_row['name']
+    # 💡 [GPT 디버깅 반영] 문자열 강제 치환 및 앞자리 0패딩 유실 차단 방어막 구축
+    ticker  = str(target_row['ticker']).strip().zfill(6)
+    name    = str(target_row['name'])
     change_rate = target_row['change_rate']
-    price = target_row['price']
-    volume = target_row['volume']
-    
-    if not target_row.get('industry') or "데이터 갱신" in str(target_row.get('market_cap', '')):
+    price   = target_row['price']
+    volume  = target_row['volume']
+
+    # 상세 데이터 비어있거나 구버전일 경우 크롤러 동기화 트리거
+    needs_update = (
+        not target_row.get('industry')
+        or "데이터 갱신" in str(target_row.get('market_cap', ''))
+    )
+    if needs_update:
         with st.spinner("기업 상세 정보 인코딩 정밀 갱신 중..."):
             details = crawler.fetch_stock_details(ticker)
             db.update_stock_detail(selected_date_str, ticker, details)
-            target_row['industry'] = details['industry']
+            target_row = target_row.copy()
+            target_row['industry']   = details['industry']
             target_row['market_cap'] = details['market_cap']
-            target_row['per'] = details['per']
-            target_row['pbr'] = details['pbr']
-            target_row['summary'] = details['summary']
+            target_row['per']        = details['per']
+            target_row['pbr']        = details['pbr']
+            target_row['summary']    = details['summary']
 
     cached_news = db.get_cached_news(ticker)
     if not cached_news:
@@ -197,12 +250,14 @@ if target_row is not None:
         db.save_news_cache(ticker, news_list)
         cached_news = news_list
 
-    inferred_reason = analyzer.analyze_reasons(cached_news)
-    intensity_score = ScoringEngine.calculate_momentum_score(change_rate, volume, len(cached_news))
+    inferred_reason  = analyzer.analyze_reasons(cached_news)
+    intensity_score  = ScoringEngine.calculate_momentum_score(
+        change_rate, volume, len(cached_news)
+    )
 
-    # 🏢 상단 영역: 정보 분석과 매매 일지를 반반 레이아웃으로 균형 있게 배치
+    # ── 상단 하프 크로스 레이아웃: 정보 분석 열 [1.0] + 매매 일지 열 [1.0] ──
     left_col, right_col = st.columns([1.0, 1.0])
-    
+
     with left_col:
         title_sub_col1, title_sub_col2 = st.columns([3, 1])
         with title_sub_col1:
@@ -221,18 +276,18 @@ if target_row is not None:
         st.markdown(f"**🔥 급등 강도 Score:** `{intensity_score}점` / 100점")
         st.progress(intensity_score / 100.0)
         st.info(f"💡 **예상 급등 사유:** {inferred_reason}")
-        
+
         st.markdown("### 🏢 핵심 분석 지표 (HTS Real-time)")
         m_col1, m_col2, m_col3 = st.columns(3)
         m_col1.metric("업종", target_row['industry'] if target_row['industry'] else "제조 및 서비스")
         m_col2.metric("시가총액", target_row['market_cap'] if target_row['market_cap'] else "N/A")
         m_col3.metric("당일 종가", f"{price:,} 원 (+{change_rate}%)")
-        
+
         per_val = target_row['per']
         pbr_val = target_row['pbr']
         per_str = f"{float(per_val):.2f} 배" if per_val and pd.notna(per_val) and float(per_val) != 0 else "N/A (적자)"
         pbr_str = f"{float(pbr_val):.2f} 배" if pbr_val and pd.notna(pbr_val) and float(pbr_val) != 0 else "N/A"
-        
+
         m_col4, m_col5, m_col6 = st.columns(3)
         m_col4.metric("PER 지표", per_str)
         m_col5.metric("PBR 지표", pbr_str)
@@ -240,47 +295,81 @@ if target_row is not None:
 
         st.markdown("### 📄 정제된 기업 개요")
         st.markdown(f'<div class="company-summary">{target_row["summary"]}</div>', unsafe_allow_html=True)
-        
+
         st.markdown("### 📰 관련 뉴스 타임라인")
         if cached_news:
-            for idx, n in enumerate(cached_news[:6], 1):  # 균형을 위해 상단 노출 뉴스 6개 조절
-                st.markdown(f"**{idx}** . [{n['title']}]({n['url']}) <span style='color:#7f8c8d; font-size:11px;'>{n['press']} | {n['pub_date']}</span>", unsafe_allow_html=True)
+            for idx, n in enumerate(cached_news[:6], 1):
+                st.markdown(
+                    f"**{idx}** . [{n['title']}]({n['url']}) "
+                    f"<span style='color:#7f8c8d; font-size:11px;'>{n['press']} | {n['pub_date']}</span>",
+                    unsafe_allow_html=True
+                )
         else:
             st.caption("특징 뉴스가 아직 로드되지 않았거나 존재하지 않습니다.")
 
     with right_col:
         st.markdown("### 📝 트레이딩 룸 매매 일지")
         memo_data = db.get_memo(selected_date_str, ticker)
-        
-        buy_reason = st.text_area("매수 이유 및 타점 관점", value=memo_data['buy_reason'], height=90)
+
+        buy_reason  = st.text_area("매수 이유 및 타점 관점", value=memo_data['buy_reason'], height=90)
         sell_reason = st.text_area("매도 및 분할 익절/손절가", value=memo_data['sell_reason'], height=90)
-        review = st.text_area("매매 관점 복기", value=memo_data['review'], height=90)
-        free_memo = st.text_area("자유 분석 메모", value=memo_data['free_memo'], height=90)
-        
+        review      = st.text_area("매매 관점 복기", value=memo_data['review'], height=90)
+        free_memo   = st.text_area("자유 분석 메모", value=memo_data['free_memo'], height=90)
+
         if st.button("💾 매매 일지 기록 저장", use_container_width=True):
             db.save_memo(selected_date_str, ticker, buy_reason, sell_reason, review, free_memo)
             st.success("기록 완료")
 
-    # ==========================================
-    # 📉 하단 배치: 대형 멀티 타임프레임 차트 피드 (Full Width)
-    # ==========================================
+    # ============================================================
+    # 📉 [클로드+GPT 디버깅 합본] 하단 대형 멀티 차트 독립 4개 탭 피드 (Full Width)
+    # ============================================================
     st.markdown("---")
     st.markdown("### 📊 대한민국 실시간 종합 차트 멀티 피드")
+
+    # 💡 정밀 디버깅 해결: f-string % 충돌 및 TypeError를 우회하기 위한 순수 하드코딩 결합 체계 구축
+    _base_url = "https://finance.naver.com/item/fchart.naver?code=" + ticker
     
-    chart_tabs = st.tabs(["네이버 실시간 일봉 차트실", "네이버 실시간 주봉 차트실", "네이버 실시간 월봉 차트실"])
-    
-    # 보안 프레임 우회를 완벽하게 충족하며 화면에 꽉 찬 560px 높이의 네이버 공식 대형 실시간 차트실 연동
+    iframe_daily = '<iframe src="' + _base_url + '&expr=1" width="100%" height="560" style="border:none; display:block;" scrolling="yes"></iframe>'
+    iframe_weekly = '<iframe src="' + _base_url + '&expr=3" width="100%" height="560" style="border:none; display:block;" scrolling="yes"></iframe>'
+    iframe_monthly = '<iframe src="' + _base_url + '&expr=5" width="100%" height="560" style="border:none; display:block;" scrolling="yes"></iframe>'
+    snapshot_url = "https://ssl.pstatic.net/imgfinance/chart/item/candle/day/" + ticker + ".png"
+
+    chart_tabs = st.tabs([
+        "📈 실시간 일봉",
+        "📊 실시간 주봉",
+        "📉 실시간 월봉",
+        "📸 당일 종가 차트 스냅샷"
+    ])
+
     with chart_tabs[0]:
-        st.iframe(f"https://finance.naver.com/item/fchart.naver?code={ticker}", height=560, scrolling=True)
-        
+        st.caption("▶ 네이버 금융 실시간 일봉 통합 차트실")
+        components.html(iframe_daily, height=575, scrolling=False)
+
     with chart_tabs[1]:
-        # 주봉 스냅샷 대용 실시간 금융 이미지 뷰어 서브 연동 포함
-        st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/week/{ticker}.png", use_container_width=True, caption="주봉 종합 분석 흐름")
-        
+        st.caption("▶ 네이버 금융 실시간 주봉 통합 차트실")
+        components.html(iframe_weekly, height=575, scrolling=False)
+
     with chart_tabs[2]:
-        # 월봉 스냅샷 대용 실시간 금융 이미지 뷰어 서브 연동 포함
-        st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/month/{ticker}.png", use_container_width=True, caption="월봉 장기 추세 흐름")
+        st.caption("▶ 네이버 금융 실시간 월봉 통합 차트실")
+        components.html(iframe_monthly, height=575, scrolling=False)
+
+    with chart_tabs[3]:
+        st.caption("▶ 네이버 금융 기준 당일 정밀 캔들 변동현황 및 누적 거래량 분성 지표")
+        st.image(
+            snapshot_url,
+            use_container_width=True,
+            caption="[" + name + " / " + ticker + "] 당일 기준 정밀 캔들 및 거래량 변동현황 스냅샷"
+        )
 
 else:
     st.title("📈 실시간 급등주 자동 분석 시스템")
-    st.info("좌측 사이드바에서 날짜를 선택하거나 주식을 리스트에서 클릭해 주십시오.")
+    st.info("좌측 사이드바에서 날짜를 선택하거나 급등주 리스트에서 종목을 클릭해 주십시오.")
+    st.markdown("""
+    #### 🧭 사용 가이드
+    | 단계 | 설명 |
+    |------|------|
+    | **1** | 사이드바 상단 **📅 분석 기준일** 에서 날짜 선택 |
+    | **2** | 데이터 없을 경우 **🔄 실시간 수집 강제 실행** 버튼 클릭 |
+    | **3** | **📈 급등주 목록** 라디오 버튼에서 종목 선택 |
+    | **4** | 하단 탭에서 **일봉 / 주봉 / 월봉 / 스냅샷** 차트 확인 |
+    """)
