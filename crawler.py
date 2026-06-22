@@ -12,21 +12,25 @@ class NaverFinanceCrawler:
     def fetch_rising_stocks(self):
         """
         코스피/코스닥 전체 시세 페이지를 전수 조사하여 
-        당일 등락률이 9.0% 이상인 모든 종목을 누락 없이 수집합니다.
+        당일 등락률이 +9.0% 이상인 순수 기업 단일 종목만 누락 없이 수집합니다.
+        (하락 종목 및 ETF/ETN 완벽 필터링)
         """
         all_stocks = []
         
+        # ETF, ETN 및 파생 상품 필터링을 위한 키워드 셋
+        exclude_keywords = [
+            "KODEX", "TIGER", "HANARO", "ACE", "SOL", "KBSTAR", "ARIRANG", "KOSEF", "TIMEFOLIO", "PLUS",
+            "ETF", "ETN", "레버리지", "인버스", "선물", "스팩", "TREX", "히어로즈", "마이티", "UNICORN"
+        ]
+        
         # sosok=0 (코스피), sosok=1 (코스닥)
         for sosok in [0, 1]:
-            # 안전하게 최대 5페이지까지 전수 조사 (보통 코스피 40장, 코스닥 35장 분량)
-            # 네이버 시세 테이블 구조를 역추적하여 데이터 유실을 원천 차단합니다.
             page = 1
             while True:
                 url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok={sosok}&page={page}"
                 res = requests.get(url, headers=self.headers)
                 soup = BeautifulSoup(res.text, "html.parser")
                 
-                # 페이지 끝에 도달했는지 검증 (네이버는 끝 페이지 이후 빈 페이지를 반환하거나 링크가 없음)
                 has_data = soup.find("table", {"class": "type_2"})
                 if not has_data:
                     break
@@ -36,15 +40,19 @@ class NaverFinanceCrawler:
                 
                 for row in rows:
                     cols = row.find_all("td")
-                    if len(cols) < 12:  # 네이버 표준 시세 컬럼 규격 검증
+                    if len(cols) < 12:
                         continue
                         
-                    # 종목명 및 티커 추출
                     name_anchor = cols[1].find("a")
                     if not name_anchor:
                         continue
                         
                     name = name_anchor.text.strip()
+                    
+                    # ── 1️⃣ ETF / ETN 및 파생상품 거르기 ──
+                    if any(keyword in name.upper() for keyword in exclude_keywords):
+                        continue
+                        
                     href = name_anchor.get("href", "")
                     ticker_match = re.search(r"code=(\d+)", href)
                     ticker = ticker_match.group(1) if ticker_match else ""
@@ -52,26 +60,31 @@ class NaverFinanceCrawler:
                     if not ticker:
                         continue
                         
-                    # 당일 종가, 등락률, 거래량 정밀 정제
                     try:
                         price = int(cols[2].text.replace(",", "").strip())
                         
-                        # 등락률 텍스트에서 플러스, 마이너스, 공백 기호 완전 제거 후 실수형 변환
+                        # 등락률 텍스트 정제 (%, +, - 공백 등 제거)
                         raw_change = cols[4].text.replace("%", "").strip()
-                        raw_change = raw_change.replace("+", "").replace("-", "")
+                        raw_change = raw_change.replace("+", "").replace("-", "").strip()
                         change_rate = float(raw_change)
                         
-                        # 하락/보합 종목 필터링 (네이버는 상승 종목에 ico_up 클래스나 빨간색 스타일을 씁니다)
-                        # 단순 절댓값 파싱 오류를 막기 위해 td 내부의 부호 이미지를 교차 체크합니다.
-                        if "ico_down" in str(cols[4]) or "ico_fall" in str(cols[4]):
-                            change_rate = -change_rate
+                        # ── 2️⃣ 부호 판별 정밀 검증 (하락/보합 종목 완전 차단) ──
+                        # 네이버 금융은 상승 종목의 등락률 td 내부에 반드시 빨간색 화살표(ico_up) 태그를 넣습니다.
+                        col_html = str(cols[4])
+                        if "ico_up" not in col_html and "상승" not in col_html:
+                            # 상한가는 별도의 클래스나 구조를 가질 수 있으므로 추가 체크
+                            if "ico_down" in col_html or "하락" in col_html or "ico_fall" in col_html:
+                                continue  # 하락 종목은 패스
+                            
+                            # 만약 상승 화살표가 없다면 보합이거나 하락이므로 리스트에서 제외
+                            continue
                             
                         volume = int(cols[9].text.replace(",", "").strip())
                     except Exception:
                         continue
                     
-                    # 💡 [핵심 타겟 보정] 당일 상승률 9.0% 이상인 주도주만 전수 적재
-                    if change_rate >= 9.0:
+                    # ── 3️⃣ 당일 실질 상승률 +9.0% 이상인 종목만 최종 적재 ──
+                    if change_rate >= 9.0 and change_rate <= 30.5: # 상한가 제한폭 보정
                         all_stocks.append({
                             "ticker": ticker,
                             "name": name,
@@ -82,15 +95,15 @@ class NaverFinanceCrawler:
                     
                     valid_row_count += 1
                 
-                # 해당 페이지에 유효한 주식 데이터 행이 전혀 없으면 루프 탈출
                 if valid_row_count == 0 or page >= 45: 
                     break
                     
                 page += 1
 
-        # 데이터프레임으로 변환 후 등락률이 높은 순서대로 탑 다운 정렬
         result_df = pd.DataFrame(all_stocks)
         if not result_df.empty:
+            # 중복 데이터 제거 및 등락률 내림차순 정렬
+            result_df = result_df.drop_duplicates(subset=['ticker']).reset_index(drop=True)
             result_df = result_df.sort_values(by="change_rate", ascending=False).reset_index(drop=True)
         return result_df
 
@@ -109,7 +122,6 @@ class NaverFinanceCrawler:
         }
         
         try:
-            # 업종 분석
             h4_tags = soup.find_all("h4")
             for h4 in h4_tags:
                 if "업종명" in h4.text:
@@ -118,12 +130,10 @@ class NaverFinanceCrawler:
                         details["industry"] = anchor.text.strip()
                         break
             
-            # 시가총액 분석
             cap_em = soup.find("em", {"id": "_market_sum"})
             if cap_em:
                 details["market_cap"] = cap_em.text.replace("\n", "").replace("\t", "").strip() + "억원"
                 
-            # PER / PBR 지표 트래킹
             per_th = soup.find("th", text="PER")
             if per_th:
                 per_td = per_th.find_next("td")
@@ -136,7 +146,6 @@ class NaverFinanceCrawler:
                 if pbr_td:
                     details["pbr"] = pbr_td.text.replace(",", "").strip()
             
-            # 기업 개요 파싱 데이터 결합
             summary_div = soup.find("div", {"class": "summary_info"})
             if summary_div:
                 details["summary"] = summary_div.text.replace("\n", " ").strip()
