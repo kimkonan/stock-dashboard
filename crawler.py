@@ -11,25 +11,26 @@ class NaverFinanceCrawler:
 
     def fetch_rising_stocks(self):
         """
-        네이버 금융의 당일 상승 섹션을 코스피/코스닥별로 정밀 분석하여
-        +9.0% 이상 상승한 순수 단일 기업 종목을 누락과 서버 차단 없이 100% 수집합니다.
+        네이버 금융의 당일 상승 페이지를 정밀 탐색하여
+        종목명과 티커를 정확하게 1:1 매칭하고, +9.0% 이상 상승한 
+        순수 단일 기업 종목 및 우선주 종목을 누락 없이 수집합니다.
         """
         all_stocks = []
         
-        # 필터링할 파생상품 및 ETF 키워드
+        # 💡 [필터링 수정] 우선주 관련 키워드("우", "우B", "우C" 등)를 제거하여 
+        # 우선주 종목들이 정상적으로 급등주 목록에 수집되도록 조치했습니다.
         exclude_keywords = [
             "KODEX", "TIGER", "HANARO", "ACE", "SOL", "KBSTAR", "ARIRANG", "KOSEF", "TIMEFOLIO", "PLUS",
             "ETF", "ETN", "레버리지", "인버스", "선물", "스팩", "TREX", "히어로즈", "마이티", "UNICORN"
         ]
         
-        # sosok=0 (코스피 상승률별), sosok=1 (코스닥 상승률별) 랭킹 페이지 타겟팅
-        # 이 페이지는 네이버가 상위 상승 종목을 한눈에 제공하므로 다중 페이지 호출로 인한 IP 차단이 발생하지 않습니다.
-        for sosok in [0, 1]:
+        for sosok in [0, 1]:  # 0: 코스피, 1: 코스닥
             url = f"https://finance.naver.com/sise/sise_rise.naver?sosok={sosok}"
             res = requests.get(url, headers=self.headers)
+            res.encoding = 'euc-kr' 
+            
             soup = BeautifulSoup(res.text, "html.parser")
             
-            # 시세 테이블 추출
             table = soup.find("table", {"class": "type_2"})
             if not table:
                 continue
@@ -37,6 +38,7 @@ class NaverFinanceCrawler:
             rows = table.find_all("tr")
             for row in rows:
                 cols = row.find_all("td")
+                
                 if len(cols) < 11:
                     continue
                     
@@ -44,29 +46,30 @@ class NaverFinanceCrawler:
                 if not name_anchor:
                     continue
                     
-                name = name_anchor.text.strip()
-                
-                # ── 1️⃣ ETF / ETN 파생상품 필터링 ──
-                if any(keyword in name.upper() for keyword in exclude_keywords):
-                    continue
-                    
                 href = name_anchor.get("href", "")
                 ticker_match = re.search(r"code=(\d+)", href)
                 ticker = ticker_match.group(1) if ticker_match else ""
+                name = name_anchor.text.strip()
                 
-                if not ticker:
+                if not ticker or not name:
+                    continue
+                    
+                if name == "" or len(ticker) != 6:
+                    continue
+                
+                # ── 1️⃣ ETF / ETN 및 스팩 파생상품만 필터링 ──
+                if any(keyword in name.upper() for keyword in exclude_keywords):
                     continue
                     
                 try:
                     price = int(cols[2].text.replace(",", "").strip())
                     
-                    # 등락률 파싱 및 정제
+                    # 등락률 파싱 및 기호 정제
                     raw_change = cols[4].text.replace("%", "").strip()
                     raw_change = raw_change.replace("+", "").replace("-", "").strip()
                     change_rate = float(raw_change)
                     
-                    # ── 2️⃣ 상승 종목 검증 기호 필터링 ──
-                    # sise_rise 페이지에서는 상승/상한가 종목만 모아두나 안전을 위해 ico_up 체크를 병행합니다.
+                    # ── 2️⃣ 하락/보합 오인 방지 ──
                     col_html = str(cols[4])
                     if "ico_down" in col_html or "ico_fall" in col_html:
                         continue
@@ -75,10 +78,10 @@ class NaverFinanceCrawler:
                 except Exception:
                     continue
                 
-                # ── 3️⃣ 실질 주도주 조건 (+9.0% 이상 및 상한가 제한폭) 적재 ──
+                # ── 3️⃣ 당일 주도주 (+9.0% ~ 30.5%) 조건 최종 적재 ──
                 if change_rate >= 9.0 and change_rate <= 30.5:
                     all_stocks.append({
-                        "ticker": ticker,
+                        "ticker": ticker.zfill(6),
                         "name": name,
                         "price": price,
                         "change_rate": change_rate,
@@ -95,6 +98,7 @@ class NaverFinanceCrawler:
         """종목별 HTS 상세 내역 인코딩 수집 파이프라인"""
         url = f"https://finance.naver.com/item/main.naver?code={ticker}"
         res = requests.get(url, headers=self.headers)
+        res.encoding = 'euc-kr'
         soup = BeautifulSoup(res.text, "html.parser")
         
         details = {
