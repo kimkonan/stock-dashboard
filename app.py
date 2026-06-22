@@ -258,16 +258,17 @@ if target_row is not None:
         with chart_tab1:
             period_tabs = st.tabs(["일봉", "주봉", "월봉"])
             
-            # 🚨 [거래소 매핑 우회 완벽 해결] 주식 고유번호({ticker})만 다이렉트로 위젯 검색 쿼리로 주입하여
-            # KRX, KS, KOSDAQ 접두사 간섭을 원천 차단하고 종목 일치율을 강제 매칭시킴
+            # 💡 [핵심 보정] 트레이딩뷰 위젯 검색에 완벽 매칭되도록 KRX:A+코드 규격 및 KRX:코드를 결합하여 주입
+            tv_symbol = f"KRX:A{ticker}"
+            
             with period_tabs[0]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={ticker}&interval=D&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
+                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={tv_symbol}&interval=D&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
                 
             with period_tabs[1]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={ticker}&interval=W&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
+                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={tv_symbol}&interval=W&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
                 
             with period_tabs[2]:
-                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={ticker}&interval=M&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
+                st.iframe(f"https://s.tradingview.com/widgetembed/?symbol={tv_symbol}&interval=M&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Asia%2FSeoul&locale=ko", height=410)
                     
         with chart_tab2:
             st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True)
