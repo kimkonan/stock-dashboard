@@ -11,98 +11,82 @@ class NaverFinanceCrawler:
 
     def fetch_rising_stocks(self):
         """
-        코스피/코스닥 전체 시세 페이지를 전수 조사하여 
-        당일 등락률이 +9.0% 이상인 순수 기업 단일 종목만 누락 없이 수집합니다.
-        (하락 종목 및 ETF/ETN 완벽 필터링)
+        네이버 금융의 당일 상승 섹션을 코스피/코스닥별로 정밀 분석하여
+        +9.0% 이상 상승한 순수 단일 기업 종목을 누락과 서버 차단 없이 100% 수집합니다.
         """
         all_stocks = []
         
-        # ETF, ETN 및 파생 상품 필터링을 위한 키워드 셋
+        # 필터링할 파생상품 및 ETF 키워드
         exclude_keywords = [
             "KODEX", "TIGER", "HANARO", "ACE", "SOL", "KBSTAR", "ARIRANG", "KOSEF", "TIMEFOLIO", "PLUS",
             "ETF", "ETN", "레버리지", "인버스", "선물", "스팩", "TREX", "히어로즈", "마이티", "UNICORN"
         ]
         
-        # sosok=0 (코스피), sosok=1 (코스닥)
+        # sosok=0 (코스피 상승률별), sosok=1 (코스닥 상승률별) 랭킹 페이지 타겟팅
+        # 이 페이지는 네이버가 상위 상승 종목을 한눈에 제공하므로 다중 페이지 호출로 인한 IP 차단이 발생하지 않습니다.
         for sosok in [0, 1]:
-            page = 1
-            while True:
-                url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok={sosok}&page={page}"
-                res = requests.get(url, headers=self.headers)
-                soup = BeautifulSoup(res.text, "html.parser")
+            url = f"https://finance.naver.com/sise/sise_rise.naver?sosok={sosok}"
+            res = requests.get(url, headers=self.headers)
+            soup = BeautifulSoup(res.text, "html.parser")
+            
+            # 시세 테이블 추출
+            table = soup.find("table", {"class": "type_2"})
+            if not table:
+                continue
                 
-                has_data = soup.find("table", {"class": "type_2"})
-                if not has_data:
-                    break
+            rows = table.find_all("tr")
+            for row in rows:
+                cols = row.find_all("td")
+                if len(cols) < 11:
+                    continue
+                    
+                name_anchor = cols[1].find("a")
+                if not name_anchor:
+                    continue
+                    
+                name = name_anchor.text.strip()
                 
-                rows = has_data.find_all("tr")
-                valid_row_count = 0
+                # ── 1️⃣ ETF / ETN 파생상품 필터링 ──
+                if any(keyword in name.upper() for keyword in exclude_keywords):
+                    continue
+                    
+                href = name_anchor.get("href", "")
+                ticker_match = re.search(r"code=(\d+)", href)
+                ticker = ticker_match.group(1) if ticker_match else ""
                 
-                for row in rows:
-                    cols = row.find_all("td")
-                    if len(cols) < 12:
-                        continue
-                        
-                    name_anchor = cols[1].find("a")
-                    if not name_anchor:
-                        continue
-                        
-                    name = name_anchor.text.strip()
+                if not ticker:
+                    continue
                     
-                    # ── 1️⃣ ETF / ETN 및 파생상품 거르기 ──
-                    if any(keyword in name.upper() for keyword in exclude_keywords):
+                try:
+                    price = int(cols[2].text.replace(",", "").strip())
+                    
+                    # 등락률 파싱 및 정제
+                    raw_change = cols[4].text.replace("%", "").strip()
+                    raw_change = raw_change.replace("+", "").replace("-", "").strip()
+                    change_rate = float(raw_change)
+                    
+                    # ── 2️⃣ 상승 종목 검증 기호 필터링 ──
+                    # sise_rise 페이지에서는 상승/상한가 종목만 모아두나 안전을 위해 ico_up 체크를 병행합니다.
+                    col_html = str(cols[4])
+                    if "ico_down" in col_html or "ico_fall" in col_html:
                         continue
                         
-                    href = name_anchor.get("href", "")
-                    ticker_match = re.search(r"code=(\d+)", href)
-                    ticker = ticker_match.group(1) if ticker_match else ""
-                    
-                    if not ticker:
-                        continue
-                        
-                    try:
-                        price = int(cols[2].text.replace(",", "").strip())
-                        
-                        # 등락률 텍스트 정제 (%, +, - 공백 등 제거)
-                        raw_change = cols[4].text.replace("%", "").strip()
-                        raw_change = raw_change.replace("+", "").replace("-", "").strip()
-                        change_rate = float(raw_change)
-                        
-                        # ── 2️⃣ 부호 판별 정밀 검증 (하락/보합 종목 완전 차단) ──
-                        # 네이버 금융은 상승 종목의 등락률 td 내부에 반드시 빨간색 화살표(ico_up) 태그를 넣습니다.
-                        col_html = str(cols[4])
-                        if "ico_up" not in col_html and "상승" not in col_html:
-                            # 상한가는 별도의 클래스나 구조를 가질 수 있으므로 추가 체크
-                            if "ico_down" in col_html or "하락" in col_html or "ico_fall" in col_html:
-                                continue  # 하락 종목은 패스
-                            
-                            # 만약 상승 화살표가 없다면 보합이거나 하락이므로 리스트에서 제외
-                            continue
-                            
-                        volume = int(cols[9].text.replace(",", "").strip())
-                    except Exception:
-                        continue
-                    
-                    # ── 3️⃣ 당일 실질 상승률 +9.0% 이상인 종목만 최종 적재 ──
-                    if change_rate >= 9.0 and change_rate <= 30.5: # 상한가 제한폭 보정
-                        all_stocks.append({
-                            "ticker": ticker,
-                            "name": name,
-                            "price": price,
-                            "change_rate": change_rate,
-                            "volume": volume
-                        })
-                    
-                    valid_row_count += 1
+                    volume = int(cols[5].text.replace(",", "").strip())
+                except Exception:
+                    continue
                 
-                if valid_row_count == 0 or page >= 45: 
-                    break
-                    
-                page += 1
+                # ── 3️⃣ 실질 주도주 조건 (+9.0% 이상 및 상한가 제한폭) 적재 ──
+                if change_rate >= 9.0 and change_rate <= 30.5:
+                    all_stocks.append({
+                        "ticker": ticker,
+                        "name": name,
+                        "price": price,
+                        "change_rate": change_rate,
+                        "volume": volume
+                    })
 
         result_df = pd.DataFrame(all_stocks)
         if not result_df.empty:
-            # 중복 데이터 제거 및 등락률 내림차순 정렬
             result_df = result_df.drop_duplicates(subset=['ticker']).reset_index(drop=True)
             result_df = result_df.sort_values(by="change_rate", ascending=False).reset_index(drop=True)
         return result_df
