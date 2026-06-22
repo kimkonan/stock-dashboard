@@ -14,14 +14,11 @@ import pandas as pd
 from datetime import datetime, date
 import os
 
-# ============================================================
-# 🔓 [보안키 인증 시스템 완전 제거] 
-# 매번 번거롭게 만들던 로그인/비밀번호 화면을 완전히 들어냈습니다.
-# ============================================================
+# 🔓 [보안키 인증 완전 제거] 바로 메인 대시보드로 직결
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = True
 
-# ── ❌ 종목 삭제 기능을 위한 세션 기억 장치 초기화 ──
+# ── ❌ 종목 삭제 기능을 위한 세션 기억 장치 ──
 if "deleted_tickers" not in st.session_state:
     st.session_state["deleted_tickers"] = set()
 
@@ -33,33 +30,54 @@ from crawler import NaverFinanceCrawler
 from news_analyzer import KeywordNewsAnalyzer
 from utils import ScoringEngine
 
-# 🎨 대시보드 가독성 최적화 CSS 주입
+# 🎨 대시보드 가독성 및 [📱 모바일 반응형] CSS 주입
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght=400;600;700&display=swap');
 
         html, body, [data-testid="stSidebar"] {
             font-family: 'Inter', -apple-system, sans-serif !important;
         }
+        
+        /* 전체 화면 기본 여백 설정 */
         .block-container {
-            padding-top: 1.5rem !important;
+            padding-top: 1rem !important;
             padding-bottom: 1rem !important;
-            padding-left: 2rem !important;
-            padding-right: 2rem !important;
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
         }
+        
+        /* 폰트 크기 화면 폭에 맞춰 유연하게 반응형 조절 */
         h1 {
-            font-size: 2.2rem !important;
+            font-size: calc(1.4rem + 0.8vw) !important;
             font-weight: 700 !important;
             margin-bottom: 0.2rem !important;
         }
         h3 {
-            font-size: 1.3rem !important;
+            font-size: calc(1.1rem + 0.4vw) !important;
             font-weight: 600 !important;
             border-left: 4px solid #ff4b4b;
             padding-left: 8px;
             margin-top: 1.2rem !important;
-            margin-bottom: 0.8rem !important;
+            margin-bottom: 0.6rem !important;
         }
+        
+        /* 📱 모바일 브라우저 환경 (화면 폭 768px 이하) 전용 레이아웃 억제 */
+        @media (max-width: 768px) {
+            .block-container {
+                padding-left: 0.6rem !important;
+                padding-right: 0.6rem !important;
+            }
+            /* 모바일에서 좌우 분할 컬럼을 강제로 100% 한 줄 꽉 차게 정렬 */
+            [data-testid="column"] {
+                width: 100% !important;
+                flex: 1 1 100% !important;
+            }
+            .stMetric {
+                padding: 6px 10px !important;
+            }
+        }
+        
         .stMetric {
             background-color: #1e2530;
             padding: 8px 12px !important;
@@ -67,11 +85,11 @@ st.markdown("""
             border: 1px solid #2d3748;
         }
         [data-testid="stMetricValue"] {
-            font-size: 1.4rem !important;
+            font-size: 1.2rem !important;
             font-weight: 700 !important;
         }
         [data-testid="stMetricLabel"] {
-            font-size: 0.85rem !important;
+            font-size: 0.8rem !important;
             color: #a0aec0 !important;
         }
         .company-summary {
@@ -79,7 +97,7 @@ st.markdown("""
             padding: 12px;
             border-radius: 6px;
             border-left: 3px solid #4a5568;
-            font-size: 0.92rem !important;
+            font-size: 0.9rem !important;
             line-height: 1.5 !important;
             color: #e2e8f0;
             margin-bottom: 1rem;
@@ -165,25 +183,22 @@ st.sidebar.subheader(f"📈 급등주 목록 ({len(view_df)}개)")
 target_row = None
 
 if not view_df.empty:
-    # 💡 [필터링] 사용자가 지운 종목은 리스트에서 완전히 제외시킵니다.
+    # 사용자가 지운 종목 리스트에서 완전 제외
     filtered_df = view_df[~view_df['ticker'].isin(st.session_state.deleted_tickers)].reset_index(drop=True)
     
     if not filtered_df.empty:
-        # 세션에 고정된 active_ticker가 없거나 이미 지워진 상태라면 첫 종목 강제 지정
         ticker_list = filtered_df['ticker'].tolist()
         if "active_ticker" not in st.session_state or st.session_state.active_ticker not in ticker_list:
             st.session_state.active_ticker = ticker_list[0]
             
-        # 종목마다 삭제(❌) 버튼과 선택 버튼을 가로로 정렬하여 동적 배치
+        # ❌ 삭제 버튼과 종목명 가로 배열 정렬 배치
         for idx, row in filtered_df.iterrows():
             side_col1, side_col2 = st.sidebar.columns([0.2, 0.8])
             
-            # ❌ 버튼 구현
             if side_col1.button("❌", key=f"del_{row['ticker']}", help=f"{row['name']} 목록에서 제외"):
                 st.session_state.deleted_tickers.add(row['ticker'])
                 st.rerun()
                 
-            # 종목 선택 링크 버튼 구현
             btn_label = f"{row['name']} (+{row['change_rate']}%)"
             if st.session_state.active_ticker == row['ticker']:
                 btn_label = f"🔥 {btn_label}"
@@ -192,11 +207,9 @@ if not view_df.empty:
                 st.session_state.active_ticker = row['ticker']
                 st.rerun()
                 
-        # 즐겨찾기 연동 보정
         if selected_fav_ticker and selected_fav_ticker in ticker_list:
             st.session_state.active_ticker = selected_fav_ticker
             
-        # 최종 메인 타겟 확정
         matched_rows = filtered_df[filtered_df['ticker'] == st.session_state.active_ticker]
         if not matched_rows.empty:
             target_row = matched_rows.iloc[0]
@@ -204,7 +217,6 @@ if not view_df.empty:
         st.sidebar.caption("모든 급등주가 제외되었습니다.")
         
     st.sidebar.markdown("---")
-    # 🔄 삭제 종목 일괄 복구기 기능 추가
     if st.sidebar.button("🔄 삭제한 종목 목록 복구", use_container_width=True):
         st.session_state.deleted_tickers.clear()
         st.rerun()
@@ -239,11 +251,11 @@ if target_row is not None:
     inferred_reason = analyzer.analyze_reasons(cached_news)
     intensity_score = ScoringEngine.calculate_momentum_score(change_rate, volume, len(cached_news))
 
-    # 🏢 상단 분할 레이아웃 [1.2 : 0.8]
-    left_col, right_col = st.columns([1.2, 0.8])
+    # 🏢 상단 분할 레이아웃 [PC: 좌우 분할 / 모바일: 간격 확보 자동 세로 전환]
+    left_col, right_col = st.columns([1.2, 0.8], gap="medium")
 
     with left_col:
-        # ── 당일 종가 차트 스냅샷 상단 배치 고정 ──
+        # ── 당일 종가 차트 스냅샷 배치 ──
         st.markdown("### 📉 네이버 금융 기준 당일 거래 현황")
         st.image(
             "https://ssl.pstatic.net/imgfinance/chart/item/candle/day/" + ticker + ".png", 
@@ -310,7 +322,7 @@ if target_row is not None:
             st.success("기록 완료")
 
     # ============================================================
-    # 📉 하단 배치: 절대 차단되지 않는 고정형 타임프레임 차트 피드 (Full Width)
+    # 📉 하단 배치: 절대 차단되지 않는 고정형 타임프레임 차트 피드
     # ============================================================
     st.markdown("---")
     st.markdown("### 📊 대한민국 실시간 종합 차트 멀티 피드")
