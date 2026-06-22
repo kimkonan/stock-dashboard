@@ -157,7 +157,7 @@ if not fav_df.empty:
 else:
     st.sidebar.caption("등록된 관심종목이 없습니다.")
 
-# 📊 [요청 반영] 급등주 목록을 좌측 사이드바 하단으로 이동 배치
+# 📊 급등주 목록 사이드바 하단 배치
 st.sidebar.markdown("---")
 st.sidebar.subheader(f"📈 급등주 목록 ({len(view_df)}개)")
 
@@ -258,33 +258,40 @@ if target_row is not None:
         with chart_tab1:
             period_tabs = st.tabs(["일봉", "주봉", "월봉"])
             intervals = ["D", "W", "M"]
-            for idx, p_tab in enumerate(period_tabs):
-                with p_tab:
-                    current_interval = intervals[idx]
-                    tradingview_html = f"""
-                    <div style="height:400px;">
-                        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-                        <script type="text/javascript">
-                        new TradingView.widget({{
-                          "autosize": true,
-                          "symbol": "KRX:{ticker}",
-                          "interval": "{current_interval}",
-                          "timezone": "Asia/Seoul",
-                          "theme": "dark",
-                          "style": "1",
-                          "locale": "ko",
-                          "toolbar_bg": "#f1f3f6",
-                          "enable_publishing": false,
-                          "hide_side_toolbar": false,
-                          "allow_symbol_change": true,
-                          "container_id": "tv_{ticker}_{current_interval}"
-                        }});
-                        </script>
-                        <div id="tv_{ticker}_{current_interval}" style="height:100%;"></div>
-                    </div>
-                    """
-                    # 🚨 [완전 해결] 라이브러리 내부 결합 충돌을 원천 차단한 순수 정적 고유 키 처리
-                    st.components.v1.html(tradingview_html, height=410, key=f"fixed_chart_component_{idx}")
+            
+            # 🚨 [해결책] 루프 내 연산을 버리고, 각 탭 컴포넌트에 완전 고정된 텍스트 키(Static String Key)를 주입
+            with period_tabs[0]:
+                html_d = f"""
+                <div style="height:400px;">
+                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                    <script type="text/javascript">
+                    new TradingView.widget({{"autosize": true, "symbol": "KRX:{ticker}", "interval": "D", "timezone": "Asia/Seoul", "theme": "dark", "style": "1", "locale": "ko", "container_id": "tv_d"}});
+                    </script>
+                    <div id="tv_d" style="height:100%;"></div>
+                </div>"""
+                st.components.v1.html(html_d, height=410, key="fixed_key_day_chart")
+                
+            with period_tabs[1]:
+                html_w = f"""
+                <div style="height:400px;">
+                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                    <script type="text/javascript">
+                    new TradingView.widget({{"autosize": true, "symbol": "KRX:{ticker}", "interval": "W", "timezone": "Asia/Seoul", "theme": "dark", "style": "1", "locale": "ko", "container_id": "tv_w"}});
+                    </script>
+                    <div id="tv_w" style="height:100%;"></div>
+                </div>"""
+                st.components.v1.html(html_w, height=410, key="fixed_key_week_chart")
+                
+            with period_tabs[2]:
+                html_m = f"""
+                <div style="height:400px;">
+                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                    <script type="text/javascript">
+                    new TradingView.widget({{"autosize": true, "symbol": "KRX:{ticker}", "interval": "M", "timezone": "Asia/Seoul", "theme": "dark", "style": "1", "locale": "ko", "container_id": "tv_m"}});
+                    </script>
+                    <div id="tv_m" style="height:100%;"></div>
+                </div>"""
+                st.components.v1.html(html_m, height=410, key="fixed_key_month_chart")
                     
         with chart_tab2:
             st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True)
