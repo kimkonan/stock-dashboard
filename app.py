@@ -224,7 +224,7 @@ if target_row is not None:
     left_col, right_col = st.columns([1.2, 0.8])
 
     with left_col:
-        # ── [요청 반영] 당일 종가 차트 스냅샷을 왼쪽 상단 메인 영역에 우선 배치 ──
+        # ── [요청 완벽 고정] 당일 종가 차트 스냅샷을 왼쪽 상단 메인 영역에 확실히 배치 ──
         st.markdown("### 📉 네이버 금융 기준 당일 거래 현황")
         st.image(
             "https://ssl.pstatic.net/imgfinance/chart/item/candle/day/" + ticker + ".png", 
@@ -291,13 +291,13 @@ if target_row is not None:
             st.success("기록 완료")
 
     # ============================================================
-    # 📉 하단 배치: 대형 멀티 타임프레임 차트 피드 (우회 규격 적용)
+    # 📉 하단 배치: 대형 멀티 타임프레임 차트 피드 (우회 규격 100% 적용)
     # ============================================================
     st.markdown("---")
     st.markdown("### 📊 대한민국 실시간 종합 차트 멀티 피드")
 
-    # 💡 [디버깅 완료] f-string 충돌 에러 주범인 st.iframe을 완전히 걷어내고
-    # components.html + 문자열 결합 기호(+) 구조로 전체 교환하여 TypeError 근절
+    # 💡 [디버깅 최종 완료] 오류 주범인 st.iframe을 완전히 다 삭제했습니다.
+    # components.html + 문자열 결합 기호(+) 구조로 주봉/월봉까지 전면 교체하여 에러 원천 차단
     _base_url = "https://finance.naver.com/item/fchart.naver?code=" + ticker
     IFRAME_W  = "100%"
     IFRAME_H  = "560"
