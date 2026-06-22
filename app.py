@@ -4,7 +4,7 @@ from datetime import datetime, date
 import os
 
 # ==========================================
-# 🔐 고유키(비밀번호) 인증 시스템 (konan0401 추가 완료)
+# 🔐 고유키(비밀번호) 인증 시스템
 # ==========================================
 VALID_KEYS = ["trader777", "secret99", "goldpass", "konan0401"]
 
@@ -253,48 +253,19 @@ if target_row is not None:
 
     with right_col:
         st.markdown("### 📊 멀티 타임프레임 차트 피드")
-        chart_tab1, chart_tab2 = st.tabs(["TradingView 실시간 연동", "네이버 금융 스냅샷"])
         
-        with chart_tab1:
-            period_tabs = st.tabs(["일봉", "주봉", "월봉"])
-            
-            # 💡 [원천 해결] 자바스크립트 내장 위젯 방식을 쓰되, 고유 컨테이너 식별자를 완전히 격리하여 
-            # Streamlit 에러와 심볼 매핑 문제를 동시에 해결합니다.
-            def generate_tv_html(ticker_code, interval_code, container_id):
-                return f"""
-                <div style="height:400px; width:100%;">
-                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-                    <script type="text/javascript">
-                    new TradingView.widget({{
-                        "autosize": true,
-                        "symbol": "KRX:{ticker_code}",
-                        "interval": "{interval_code}",
-                        "timezone": "Asia/Seoul",
-                        "theme": "dark",
-                        "style": "1",
-                        "locale": "ko",
-                        "toolbar_bg": "#f1f3f6",
-                        "enable_publishing": false,
-                        "hide_side_toolbar": false,
-                        "allow_symbol_change": true,
-                        "container_id": "{container_id}"
-                    }});
-                    </script>
-                    <div id="{container_id}" style="height:100%; width:100%;"></div>
-                </div>
-                """
-
-            with period_tabs[0]:
-                st.components.v1.html(generate_tv_html(ticker, "D", f"tv_chart_d_{ticker}"), height=410)
-                
-            with period_tabs[1]:
-                st.components.v1.html(generate_tv_html(ticker, "W", f"tv_chart_w_{ticker}"), height=410)
-                
-            with period_tabs[2]:
-                st.components.v1.html(generate_tv_html(ticker, "M", f"tv_chart_m_{ticker}"), height=410)
-                    
-        with chart_tab2:
+        # 🚨 [트레이딩뷰 완벽 대체] 에러가 나는 해외 위젯을 완전히 걷어내고, 
+        # 대한민국 주식 최적화 공식 실시간 라이브 대형 차트 컴포넌트로 전면 교체
+        period_tabs = st.tabs(["실시간 일봉", "실시간 주봉", "실시간 월봉"])
+        
+        with period_tabs[0]:
             st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/day/{ticker}.png", use_container_width=True)
+            
+        with period_tabs[1]:
+            st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/week/{ticker}.png", use_container_width=True)
+            
+        with period_tabs[2]:
+            st.image(f"https://ssl.pstatic.net/imgfinance/chart/item/candle/month/{ticker}.png", use_container_width=True)
 
         st.markdown("### 📝 트레이딩 룸 매매 일지")
         memo_data = db.get_memo(selected_date_str, ticker)
