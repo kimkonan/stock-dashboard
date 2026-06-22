@@ -222,7 +222,19 @@ if target_row is not None:
     # 🏢 상단 분할 레이아웃 [1.2 : 0.8]
     left_col, right_col = st.columns([1.2, 0.8])
 
+   # 🏢 상단 분할 레이아웃 [1.2 : 0.8]
+    left_col, right_col = st.columns([1.2, 0.8])
+
     with left_col:
+        # ── 📉 당일 종가 차트 스냅샷 메인 영역 복구 ──
+        st.markdown("### 📉 네이버 금융 기준 당일 거래 현황")
+        st.image(
+            "https://ssl.pstatic.net/imgfinance/chart/item/candle/day/" + ticker + ".png", 
+            use_container_width=True, 
+            caption="당일 기준 정밀 캔들 및 거래량 변동현황 스냅샷"
+        )
+        st.markdown("---")
+
         title_sub_col1, title_sub_col2 = st.columns([3, 1])
         with title_sub_col1:
             st.title(f"{name} ({ticker})")
@@ -266,7 +278,6 @@ if target_row is not None:
                 st.markdown(f"**{idx}** . [{n['title']}]({n['url']}) <span style='color:#7f8c8d; font-size:11px;'>{n['press']} | {n['pub_date']}</span>", unsafe_allow_html=True)
         else:
             st.caption("특징 뉴스가 아직 로드되지 않았거나 존재하지 않습니다.")
-
     with right_col:
         st.markdown("### 📝 트레이딩 룸 매매 일지")
         memo_data = db.get_memo(selected_date_str, ticker)
